@@ -1,0 +1,11 @@
+# Tasks
+- [ ] Task 1: 优化文本选择上下文菜单，增加播放按钮
+  - [ ] SubTask 1.1: 打开 `lib/pages/home_page.dart`。
+  - [ ] SubTask 1.2: 找到 `SelectionArea` 及其 `contextMenuBuilder`。
+  - [ ] SubTask 1.3: 将原有的“朗读”按钮文案更新为“▶ 播放”（或使用含播放图标的组件）。
+- [ ] Task 2: 增加未配置时的提示与导航逻辑
+  - [ ] SubTask 2.1: 在 `_translate` 方法执行核心逻辑前，检查当前的翻译配置（可通过 `AppProvider` 获取 `translationConfigs` 校验当前选中的 Provider 的 apiKey 是否为空）。
+  - [ ] SubTask 2.2: 如果配置无效/未填写，弹出一个 `AlertDialog`。
+  - [ ] SubTask 2.3: 弹窗内容包含提示文本，以及【取消】和【前往配置】两个 `TextButton`。
+  - [ ] SubTask 2.4: 点击【前往配置】时，关闭弹窗并通过 `Navigator.push` 跳转到 `SettingsPage`。
+  - [ ] SubTask 2.5: 对于 TTS 朗读功能，如需特定配置也可复用此弹窗逻辑（如果当前 TTS 不需要配置则主要校验翻译）。

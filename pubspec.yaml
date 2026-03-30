@@ -54,6 +54,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^3.0.0
+  msix: ^2.4.0
+
+msix_config:
+  display_name: KKMarkdown
+  publisher_display_name: KK
+  identity_name: kkmarkdown
+  msix_version: 1.0.0.0
+  logo_path: windows\runner\resources\app_icon.ico
+  architecture: x64
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

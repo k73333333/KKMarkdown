@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/app_provider.dart';
 import '../api/translation_manager.dart';
 import '../utils/logger.dart';
@@ -178,138 +180,267 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /**
+   * 打开文件
+   */
+  Future<void> _openFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['md', 'txt'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final path = result.files.single.path!;
+        final file = File(path);
+        final content = await file.readAsString();
+
+        setState(() {
+          _controller.text = content;
+        });
+
+        if (mounted) {
+          Provider.of<AppProvider>(context, listen: false)
+              .setCurrentFilePath(path);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件读取成功')),
+          );
+        }
+      }
+    } catch (e) {
+      Logger.error('打开文件失败', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('打开文件失败: $e')),
+        );
+      }
+    }
+  }
+
+  /**
+   * 保存文件
+   */
+  Future<void> _saveFile() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final currentPath = appProvider.currentFilePath;
+
+    if (currentPath != null && currentPath.isNotEmpty) {
+      try {
+        final file = File(currentPath);
+        await file.writeAsString(_controller.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('保存成功')),
+          );
+        }
+      } catch (e) {
+        Logger.error('保存文件失败', e);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存文件失败: $e')),
+          );
+        }
+      }
+    } else {
+      // 当前没有打开的文件，执行另存为
+      await _saveAsFile();
+    }
+  }
+
+  /**
+   * 另存为文件
+   */
+  Future<void> _saveAsFile() async {
+    try {
+      final String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: '另存为',
+        fileName: '未命名.md',
+        type: FileType.custom,
+        allowedExtensions: ['md', 'txt'],
+      );
+
+      if (outputFile != null) {
+        final file = File(outputFile);
+        await file.writeAsString(_controller.text);
+
+        if (mounted) {
+          Provider.of<AppProvider>(context, listen: false)
+              .setCurrentFilePath(outputFile);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('保存成功')),
+          );
+        }
+      }
+    } catch (e) {
+      Logger.error('另存为失败', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('另存为失败: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('KKMarkdown'),
-        actions: [
-          // 视图切换按钮组
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: ToggleButtons(
-              borderRadius: BorderRadius.circular(8.0),
-              isSelected: [
-                _viewMode == ViewMode.edit,
-                _viewMode == ViewMode.split,
-                _viewMode == ViewMode.preview,
-              ],
-              onPressed: (int index) {
-                setState(() {
-                  if (index == 0) _viewMode = ViewMode.edit;
-                  if (index == 1) _viewMode = ViewMode.split;
-                  if (index == 2) _viewMode = ViewMode.preview;
-                });
-              },
-              children: const [
-                Tooltip(
-                    message: '仅编辑',
-                    child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Icon(Icons.edit))),
-                Tooltip(
-                    message: '双屏预览',
-                    child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Icon(Icons.vertical_split))),
-                Tooltip(
-                    message: '仅预览',
-                    child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Icon(Icons.visibility))),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: '设置',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Row(
-        children: [
-          // 左侧编辑区
-          if (_viewMode == ViewMode.edit || _viewMode == ViewMode.split)
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                color: Theme.of(context).cardColor,
-                child: TextField(
-                  controller: _controller,
-                  maxLines: null,
-                  expands: true,
-                  style: const TextStyle(fontFamily: 'Consolas', fontSize: 14),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '在此输入 Markdown 内容...',
-                  ),
-                  onChanged: (text) {
-                    setState(() {}); // 触发预览更新
+    return Consumer<AppProvider>(
+      builder: (context, appProvider, child) {
+        final currentFile = appProvider.currentFilePath;
+        final fileName = currentFile != null
+            ? currentFile.split(Platform.pathSeparator).last
+            : '未命名';
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('KKMarkdown - $fileName'),
+            actions: [
+              // 文件操作按钮组
+              IconButton(
+                icon: const Icon(Icons.folder_open),
+                tooltip: '打开文件',
+                onPressed: _openFile,
+              ),
+              IconButton(
+                icon: const Icon(Icons.save),
+                tooltip: '保存',
+                onPressed: _saveFile,
+              ),
+              IconButton(
+                icon: const Icon(Icons.save_as),
+                tooltip: '另存为',
+                onPressed: _saveAsFile,
+              ),
+              const SizedBox(width: 16),
+              // 视图切换按钮组
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ToggleButtons(
+                  borderRadius: BorderRadius.circular(8.0),
+                  isSelected: [
+                    _viewMode == ViewMode.edit,
+                    _viewMode == ViewMode.split,
+                    _viewMode == ViewMode.preview,
+                  ],
+                  onPressed: (int index) {
+                    setState(() {
+                      if (index == 0) _viewMode = ViewMode.edit;
+                      if (index == 1) _viewMode = ViewMode.split;
+                      if (index == 2) _viewMode = ViewMode.preview;
+                    });
                   },
+                  children: const [
+                    Tooltip(
+                        message: '仅编辑',
+                        child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Icon(Icons.edit))),
+                    Tooltip(
+                        message: '双屏预览',
+                        child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Icon(Icons.vertical_split))),
+                    Tooltip(
+                        message: '仅预览',
+                        child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Icon(Icons.visibility))),
+                  ],
                 ),
               ),
-            ),
-          // 分割线
-          if (_viewMode == ViewMode.split) const VerticalDivider(width: 1),
-          // 右侧预览区
-          if (_viewMode == ViewMode.preview || _viewMode == ViewMode.split)
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: SelectionArea(
-                  child: Markdown(
-                    data: _controller.text,
-                    selectable: true,
-                    onTapText: () {
-                      // 点击文本事件
-                    },
-                  ),
-                  contextMenuBuilder: (BuildContext context,
-                      SelectableRegionState selectableRegionState) {
-                    return AdaptiveTextSelectionToolbar.buttonItems(
-                      anchors: selectableRegionState.contextMenuAnchors,
-                      buttonItems: [
-                        ...selectableRegionState.contextMenuButtonItems,
-                        ContextMenuButtonItem(
-                          onPressed: () {
-                            final text = selectableRegionState
-                                .textEditingValue.selection
-                                .textInside(selectableRegionState
-                                    .textEditingValue.text);
-                            _translate(text);
-                            selectableRegionState.hideToolbar();
-                          },
-                          label: '翻译',
-                        ),
-                        ContextMenuButtonItem(
-                          onPressed: () {
-                            final text = selectableRegionState
-                                .textEditingValue.selection
-                                .textInside(selectableRegionState
-                                    .textEditingValue.text);
-                            _speak(text);
-                            selectableRegionState.hideToolbar();
-                          },
-                          label: '▶ 播放',
-                        ),
-                      ],
-                    );
-                  },
-                ),
+              const SizedBox(width: 16),
+              IconButton(
+                icon: const Icon(Icons.settings),
+                tooltip: '设置',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()),
+                  );
+                },
               ),
-            ),
-        ],
-      ),
+            ],
+          ),
+          body: Row(
+            children: [
+              // 左侧编辑区
+              if (_viewMode == ViewMode.edit || _viewMode == ViewMode.split)
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(16.0),
+                    color: Theme.of(context).cardColor,
+                    child: TextField(
+                      controller: _controller,
+                      maxLines: null,
+                      expands: true,
+                      style:
+                          const TextStyle(fontFamily: 'Consolas', fontSize: 14),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '在此输入 Markdown 内容...',
+                      ),
+                      onChanged: (text) {
+                        setState(() {}); // 触发预览更新
+                      },
+                    ),
+                  ),
+                ),
+              // 分割线
+              if (_viewMode == ViewMode.split) const VerticalDivider(width: 1),
+              // 右侧预览区
+              if (_viewMode == ViewMode.preview || _viewMode == ViewMode.split)
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(16.0),
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    child: SelectionArea(
+                      child: Markdown(
+                        data: _controller.text,
+                        selectable: false,
+                        onTapText: () {
+                          // 点击文本事件
+                        },
+                      ),
+                      contextMenuBuilder: (BuildContext context,
+                          SelectableRegionState selectableRegionState) {
+                        return AdaptiveTextSelectionToolbar.buttonItems(
+                          anchors: selectableRegionState.contextMenuAnchors,
+                          buttonItems: [
+                            ...selectableRegionState.contextMenuButtonItems,
+                            ContextMenuButtonItem(
+                              onPressed: () {
+                                final text = selectableRegionState
+                                    .textEditingValue.selection
+                                    .textInside(selectableRegionState
+                                        .textEditingValue.text);
+                                _translate(text);
+                                selectableRegionState.hideToolbar();
+                              },
+                              label: '翻译',
+                            ),
+                            ContextMenuButtonItem(
+                              onPressed: () {
+                                final text = selectableRegionState
+                                    .textEditingValue.selection
+                                    .textInside(selectableRegionState
+                                        .textEditingValue.text);
+                                _speak(text);
+                                selectableRegionState.hideToolbar();
+                              },
+                              label: '▶ 播放',
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +19,9 @@ class AppProvider with ChangeNotifier {
   /** 当前选中的翻译服务商 */
   String _selectedProvider = 'baidu';
 
+  /** 当前打开的文件绝对路径 */
+  String? _currentFilePath;
+
   /** 
    * 获取当前主题模式
    */
@@ -36,13 +38,18 @@ class AppProvider with ChangeNotifier {
   String get selectedProvider => _selectedProvider;
 
   /**
+   * 获取当前打开的文件绝对路径
+   */
+  String? get currentFilePath => _currentFilePath;
+
+  /**
    * 初始化 Provider
    * 加载本地存储的配置
    */
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 加载主题配置
       final themeIndex = prefs.getInt('themeMode') ?? 0;
       _themeMode = ThemeMode.values[themeIndex];
@@ -52,7 +59,8 @@ class AppProvider with ChangeNotifier {
       if (configJson != null) {
         try {
           final List<dynamic> jsonList = jsonDecode(configJson);
-          _translationConfigs = jsonList.map((e) => TranslationConfig.fromJson(e)).toList();
+          _translationConfigs =
+              jsonList.map((e) => TranslationConfig.fromJson(e)).toList();
         } catch (e) {
           Logger.error('解析翻译配置失败', e);
         }
@@ -74,7 +82,7 @@ class AppProvider with ChangeNotifier {
           ),
         ];
       }
-      
+
       // 加载选中的服务商
       _selectedProvider = prefs.getString('selectedProvider') ?? 'baidu';
 
@@ -117,7 +125,7 @@ class AppProvider with ChangeNotifier {
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     notifyListeners();
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('themeMode', mode.index);
@@ -131,13 +139,14 @@ class AppProvider with ChangeNotifier {
    * @param config 新的翻译配置
    */
   void updateTranslationConfig(TranslationConfig config) {
-    final index = _translationConfigs.indexWhere((c) => c.provider == config.provider);
+    final index =
+        _translationConfigs.indexWhere((c) => c.provider == config.provider);
     if (index != -1) {
       _translationConfigs[index] = config;
     } else {
       _translationConfigs.add(config);
     }
-    
+
     _syncToTranslationManager();
     notifyListeners();
     _saveTranslationConfigs();
@@ -152,5 +161,22 @@ class AppProvider with ChangeNotifier {
     _syncToTranslationManager();
     notifyListeners();
     _saveTranslationConfigs();
+  }
+
+  /**
+   * 设置当前打开的文件路径
+   * @param path 文件绝对路径
+   */
+  void setCurrentFilePath(String? path) {
+    _currentFilePath = path;
+    notifyListeners();
+  }
+
+  /**
+   * 清除当前文件路径（用于新建文件）
+   */
+  void clearCurrentFile() {
+    _currentFilePath = null;
+    notifyListeners();
   }
 }

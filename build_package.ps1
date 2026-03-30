@@ -1,14 +1,10 @@
-﻿<#
-.SYNOPSIS
-一键构建并打包 KKMarkdown Windows 客户端。
-
-.DESCRIPTION
-该脚本将执行以下操作：
-1. 编译 Flutter Windows Release 版本。
-2. 将构建好的 Release 文件夹压缩为“免安装绿色版”（kkmarkdown_portable.zip）。
-3. 使用 msix 插件生成 Windows 安装包（.msix）。
-4. 将生成的压缩包和安装包统一移动到项目根目录下的 release/ 成品目录中。
-#>
+﻿﻿﻿# 一键构建并打包 KKMarkdown Windows 客户端。
+#
+# 该脚本将执行以下操作：
+# 1. 编译 Flutter Windows Release 版本。
+# 2. 将构建好的 Release 文件夹压缩为“免安装绿色版”（kkmarkdown_portable.zip）。
+# 3. 使用 msix 插件生成 Windows 安装包（.msix）。
+# 4. 将生成的压缩包和安装包统一移动到项目根目录下的 release/ 成品目录中。
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = "C:\Users\kkk\Desktop\my\kkMarkdown"
@@ -86,3 +82,5 @@ if (Test-Path -Path $MsixSource1) {
 Write-Host "`n========== 构建与打包全部完成! ==========" -ForegroundColor Cyan
 Write-Host "成品文件位于: $ReleaseDir" -ForegroundColor Cyan
 Get-ChildItem -Path $ReleaseDir | Select-Object Name, Length | Format-Table
+
+

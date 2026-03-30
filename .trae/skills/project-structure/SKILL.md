@@ -1,3 +1,10 @@
+<!--
+ * @Author: fukaidong qiji777@yeah.net
+ * @Date: 2026-03-20 14:48:06
+ * @LastEditors: fukaidong qiji777@yeah.net
+ * @LastEditTime: 2026-03-20 15:09:18
+ * @Description: .
+-->
 ---
 name: "project-structure"
 description: "说明项目各模块分别在哪里。当新增文件、重构目录或询问项目结构时必须调用此技能；若发现新增了文件，必须同步更新此技能的内容。"

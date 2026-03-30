@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = "C:\Users\kkk\Desktop\my\kkMarkdown"
-$ReleaseDir = Join-Path $ProjectRoot "release"
+$ReleaseDir = Join-Path $ProjectRoot "outputs"
 $BuildReleaseDir = Join-Path $ProjectRoot "build\windows\x64\runner\Release"
 $AppName = "kkmarkdown"
 
@@ -43,23 +43,44 @@ if (Test-Path -Path $BuildReleaseDir) {
 }
 
 # 4. 生成 MSIX 安装包
-Write-Host "`n[3/4] 正在生成 MSIX 安装包..." -ForegroundColor Green
-# 使用 dart run msix:create 生成安装包
-# 忽略错误以便即使没证书报错也能复制出来
+Write-Host "`n[3/4] 正在生成 MSIX 和 EXE 安装包..." -ForegroundColor Green
+# MSIX 插件在某些版本中默认寻找 build/windows/runner/Release
+# 如果该目录不存在，我们需要把 x64 的内容复制过去欺骗它
+$LegacyReleaseDir = Join-Path $ProjectRoot "build\windows\runner\Release"
+if (!(Test-Path -Path $LegacyReleaseDir)) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $LegacyReleaseDir) | Out-Null
+    Copy-Item -Path $BuildReleaseDir -Destination (Split-Path $LegacyReleaseDir) -Recurse -Force
+}
+
 $ErrorActionPreference = "Continue"
+Write-Host ">>> 正在生成 MSIX..." -ForegroundColor DarkGray
 dart run msix:create
+
+# 使用 Inno Setup 生成 EXE 安装包
+$InnoCompiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+$InnoScript = Join-Path $ProjectRoot "windows\setup.iss"
+if (Test-Path -Path $InnoCompiler) {
+    Write-Host ">>> 正在调用 Inno Setup 生成 EXE..." -ForegroundColor DarkGray
+    & $InnoCompiler $InnoScript
+} else {
+    Write-Host "警告: 未检测到 Inno Setup ($InnoCompiler)，跳过 EXE 安装包生成。" -ForegroundColor Yellow
+}
 $ErrorActionPreference = "Stop"
 
 # 5. 移动 MSIX 到成品目录
 Write-Host "`n[4/4] 正在收集成品..." -ForegroundColor Green
-$MsixSource = Join-Path $BuildReleaseDir "${AppName}.msix"
-$MsixDest = Join-Path $ReleaseDir "${AppName}_setup.msix"
+$MsixSource1 = Join-Path $BuildReleaseDir "${AppName}.msix"
+$MsixSource2 = Join-Path $ProjectRoot "build\windows\runner\Release\${AppName}.msix"
+$MsixDest = Join-Path $ReleaseDir "${AppName}_msix_setup.msix"
 
-if (Test-Path -Path $MsixSource) {
-    Move-Item -Path $MsixSource -Destination $MsixDest -Force
+if (Test-Path -Path $MsixSource1) {
+    Move-Item -Path $MsixSource1 -Destination $MsixDest -Force
+    Write-Host "安装包已移动: $MsixDest" -ForegroundColor DarkGreen
+} elseif (Test-Path -Path $MsixSource2) {
+    Move-Item -Path $MsixSource2 -Destination $MsixDest -Force
     Write-Host "安装包已移动: $MsixDest" -ForegroundColor DarkGreen
 } else {
-    Write-Host "警告: 未能找到生成的 MSIX 文件 ($MsixSource)，可能生成失败。" -ForegroundColor Red
+    Write-Host "警告: 未能找到生成的 MSIX 文件，可能生成失败。" -ForegroundColor Red
 }
 
 Write-Host "`n========== 构建与打包全部完成! ==========" -ForegroundColor Cyan

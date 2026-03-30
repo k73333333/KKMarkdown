@@ -1,11 +1,21 @@
+<!--
+ * @Author: fukaidong qiji777@yeah.net
+ * @Date: 2026-03-11 09:44:26
+ * @LastEditors: fukaidong qiji777@yeah.net
+ * @LastEditTime: 2026-03-30 11:20:11
+ * @Description: .
+-->
 
 # KKMarkdown
 
 一个轻量级的 Markdown 阅读器/编辑器，使用 Flutter 开发，支持 Windows 平台。
 
+**作者**：fukaidong
+
 ## 主要功能
 
 - **Markdown 编辑与预览**：左侧编辑，右侧实时预览。
+- **本地文件管理**：支持打开、编辑、保存 `.md` 和 `.txt` 文件。
 - **划词功能**：在预览区选中文字后，支持：
   - **翻译**：调用配置的翻译接口进行翻译。
   - **朗读**：使用 TTS 朗读选中文本。
@@ -19,12 +29,24 @@
 - **框架**：Flutter (Windows Desktop)
 - **状态管理**：Provider
 - **Markdown 渲染**：flutter_markdown
+- **文件选择**：file_picker
 - **网络请求**：http
 - **本地存储**：shared_preferences
 - **文本转语音**：flutter_tts
 - **窗口管理**：window_manager
 
-## 快速开始
+## 成品安装包与运行
+
+如果您只想直接运行应用，可以获取已打包好的成品文件。
+我们提供了自动化构建脚本 `build_package.ps1`，构建完成后，成品将存放在项目根目录的 `outputs/` 文件夹中：
+
+- **标准安装包 (.exe)**：`outputs/kkmarkdown_setup.exe` (最推荐，双击无痛安装，自动创建快捷方式)
+- **免安装绿色版**：`outputs/kkmarkdown_portable.zip` (解压即可运行)
+- **Windows 安装包**：`outputs/kkmarkdown_msix_setup.msix` (可能需要手动信任证书)
+
+详细的打包说明请参阅 [PACKAGING_GUIDE.md](./PACKAGING_GUIDE.md)。
+
+## 快速开始 (开发者)
 
 1. **环境准备**：
    - 确保已安装 Flutter SDK (推荐 3.3.0+)。

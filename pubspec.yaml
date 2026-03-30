@@ -43,6 +43,7 @@ dependencies:
   flutter_tts: ^3.8.5
   window_manager: ^0.3.8
   url_launcher: ^6.2.5
+  inno_bundle: ^0.7.4
 
 dev_dependencies:
   flutter_test:
@@ -56,13 +57,18 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   msix: ^2.4.0
 
-msix_config:
-  display_name: KKMarkdown
-  publisher_display_name: KK
-  identity_name: kkmarkdown
-  msix_version: 1.0.0.0
-  logo_path: windows\runner\resources\app_icon.ico
-  architecture: x64
+inno_bundle:
+  id: 060f4d59-a9a4-4561-9ae1-5822633d46ad
+  name: KKMarkdown
+  publisher: fukaidong
+  url: https://github.com/fukaidong/kkmarkdown
+  support_url: https://github.com/fukaidong/kkmarkdown/issues
+  updates_url: https://github.com/fukaidong/kkmarkdown/releases
+  privileges_required: lowest
+  setup_icon: windows\runner\resources\app_icon.ico
+  languages:
+    - english
+  app_version: 1.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

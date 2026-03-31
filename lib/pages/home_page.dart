@@ -546,8 +546,9 @@ class _HomePageState extends State<HomePage> {
    * 显示删除图片的右键菜单
    */
   void _showDeleteImageMenu(String imageId, Offset position) async {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
     final result = await showMenu(
       context: context,
       position: RelativeRect.fromRect(
@@ -606,6 +607,22 @@ class _HomePageState extends State<HomePage> {
     final imageUrl = _imageBase64Cache[imageId] ?? imageId; // 获取真实 base64
     final bool isBase64 = imageUrl.startsWith('data:image');
 
+    // 优化性能 1：将超长无空格的 Base64 字符串强制换行，避免 Flutter 文本排版引擎（HarfBuzz）计算单行超长文本导致严重卡顿
+    String displayUrl = imageUrl;
+    if (isBase64 && imageUrl.length > 500) {
+      final buffer = StringBuffer();
+      for (int i = 0; i < imageUrl.length; i += 100) {
+        int end = i + 100;
+        if (end > imageUrl.length) end = imageUrl.length;
+        buffer.writeln(imageUrl.substring(i, end));
+      }
+      displayUrl = buffer.toString();
+    }
+
+    // 优化性能 2：提前初始化 Controller，避免在弹窗更新（StatefulBuilder 动画）时反复创建和解析超长文本
+    final TextEditingController sourceController =
+        TextEditingController(text: displayUrl);
+
     showDialog(
       context: context,
       builder: (context) {
@@ -638,8 +655,7 @@ class _HomePageState extends State<HomePage> {
                                     const SizedBox(height: 8),
                                     Expanded(
                                       child: TextField(
-                                        controller: TextEditingController(
-                                            text: imageUrl),
+                                        controller: sourceController,
                                         maxLines: null,
                                         expands: true,
                                         style: const TextStyle(
@@ -728,7 +744,10 @@ class _HomePageState extends State<HomePage> {
           },
         );
       },
-    );
+    ).then((_) {
+      // 弹窗关闭后释放内存
+      sourceController.dispose();
+    });
   }
 
   @override

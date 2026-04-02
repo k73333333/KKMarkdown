@@ -1001,25 +1001,39 @@ class _HomePageState extends State<HomePage> with WindowListener {
             if (_isTocExpanded)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                width: 240,
+                width: 260,
                 margin: const EdgeInsets.only(right: 20),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2D2D30)
-                      : const Color(0xFFF9FAFB),
-                  border: Border.all(color: dividerColor.withOpacity(0.2)),
-                  borderRadius: BorderRadius.circular(10),
+                  color: isDark ? const Color(0xFF252526) : Colors.white,
+                  border: Border.all(color: dividerColor.withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
-                    SizedBox(
-                      height: 44,
+                    Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF2D2D30)
+                            : const Color(0xFFF8F9FA),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12)),
+                      ),
                       child: Row(
                         children: [
                           const SizedBox(width: 16),
-                          const Icon(Icons.format_list_bulleted, size: 18),
+                          Icon(Icons.format_list_bulleted,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 8),
-                          const Text('目录',
+                          const Text('大纲目录',
                               style: TextStyle(
                                   fontWeight: FontWeight.w600, fontSize: 14)),
                           const Spacer(),
@@ -1036,22 +1050,24 @@ class _HomePageState extends State<HomePage> with WindowListener {
                         ],
                       ),
                     ),
-                    Divider(height: 1, color: dividerColor.withOpacity(0.2)),
+                    Divider(height: 1, color: dividerColor.withOpacity(0.1)),
                     Expanded(
                       child: TocWidget(
                         controller: _tocController,
                         padding: const EdgeInsets.symmetric(
-                            vertical: 8, horizontal: 8),
+                            vertical: 12, horizontal: 12),
                         tocTextStyle: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
+                          height: 1.5,
                           color: Theme.of(context)
                               .textTheme
                               .bodyMedium
                               ?.color
-                              ?.withOpacity(0.8),
+                              ?.withOpacity(0.7),
                         ),
                         currentTocTextStyle: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
+                          height: 1.5,
                           color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1062,29 +1078,37 @@ class _HomePageState extends State<HomePage> with WindowListener {
               )
             else
               Padding(
-                padding: const EdgeInsets.only(right: 16.0),
+                padding: const EdgeInsets.only(right: 20.0),
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: Tooltip(
                     message: '展开目录',
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       onTap: () {
                         setState(() {
                           _isTocExpanded = true;
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF2D2D30)
-                              : const Color(0xFFF9FAFB),
+                          color: cardColor,
                           border:
-                              Border.all(color: dividerColor.withOpacity(0.2)),
-                          borderRadius: BorderRadius.circular(8),
+                              Border.all(color: dividerColor.withOpacity(0.1)),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.format_list_bulleted, size: 18),
+                        child: Icon(Icons.format_list_bulleted,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary),
                       ),
                     ),
                   ),

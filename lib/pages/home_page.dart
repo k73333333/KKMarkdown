@@ -158,7 +158,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
 
   final TocController _tocController = TocController();
 
-  bool _isTocExpanded = true;
+  bool _isTocExpanded = false;
 
   /** 窗口是否最大化 */
   bool _isMaximized = false;

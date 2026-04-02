@@ -14,7 +14,8 @@ AppId={{060f4d59-a9a4-4561-9ae1-5822633d46ad}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\{#MyAppName}
+; 使用自定义的 GetInstallDir 函数动态计算非 D 盘路径
+DefaultDirName={code:GetInstallDir}
 DisableProgramGroupPage=yes
 ; 设置输出目录和安装包名称
 OutputDir={#OutputFolder}
@@ -47,3 +48,28 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 ; 安装完成后提供运行选项
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// 自定义 Pascal Script 逻辑
+function GetInstallDir(Param: String): String;
+var
+  SystemDrive: String;
+  AutoPfPath: String;
+begin
+  // 获取系统盘符 (通常为 C:)
+  SystemDrive := ExpandConstant('{sysdrive}');
+  // 获取默认的 Program Files 路径 (可能是 D:\Program Files，由用户系统配置决定)
+  AutoPfPath := ExpandConstant('{autopf}');
+  
+  // 如果默认 Program Files 恰好是 D 盘，则强制改回系统盘(C盘)的 Program Files 
+  if (Uppercase(Copy(AutoPfPath, 1, 2)) = 'D:') then
+  begin
+    // 替换盘符为系统盘，保留后缀路径
+    Result := SystemDrive + Copy(AutoPfPath, 3, Length(AutoPfPath)) + '\{#MyAppName}';
+  end
+  else
+  begin
+    // 如果不是 D 盘，使用系统默认的 Program Files
+    Result := AutoPfPath + '\{#MyAppName}';
+  end;
+end;

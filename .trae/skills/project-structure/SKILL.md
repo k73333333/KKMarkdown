@@ -18,7 +18,9 @@ description: "说明项目各模块分别在哪里。当新增文件、重构目
 
 - **`lib/api/`**: 存放与外部接口、网络请求相关的逻辑。例如：`translation_manager.dart` 等接口服务封装。
 - **`lib/models/`**: 存放数据模型和实体类。例如：`translation_config.dart` 等与业务相关的数据结构。
-- **`lib/pages/`**: 存放 UI 页面组件。例如：`home_page.dart` (主页视图), `settings_page.dart` (设置视图) 等。
+- **`lib/pages/`**: 存放 UI 页面组件。
+  - **`home/`**: 首页相关模块，包含 `home_page.dart` 及其子组件（`widgets/`）和专属逻辑（`logic/`）。
+  - **`settings/`**: 设置页相关模块，包含 `settings_page.dart` 及其子组件（`widgets/`）。
 - **`lib/providers/`**: 存放状态管理相关的 Provider 类。例如：`app_provider.dart`，用于跨组件状态共享和管理。
 - **`lib/utils/`**: 存放通用工具类和辅助函数。例如：`logger.dart` 等公共方法。
 - **`lib/main.dart`**: 应用程序的入口文件，包含 App 的初始化与路由配置。

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
@@ -23,14 +22,19 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _showTranslationButton = false;
   bool _showTtsButton = false;
 
+  // 主题颜色状态
+  late Color _themeColor;
+
   @override
   void initState() {
     super.initState();
     // 从 Provider 获取当前配置的副本
     final provider = Provider.of<AppProvider>(context, listen: false);
-    _editingConfigs = provider.translationConfigs.map((e) => e.copyWith()).toList();
+    _editingConfigs =
+        provider.translationConfigs.map((e) => e.copyWith()).toList();
     _showTranslationButton = provider.showTranslationButton;
     _showTtsButton = provider.showTtsButton;
+    _themeColor = provider.themeColor;
   }
 
   /**
@@ -43,6 +47,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     provider.setShowTranslationButton(_showTranslationButton);
     provider.setShowTtsButton(_showTtsButton);
+    provider.setThemeColor(_themeColor);
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('配置已保存')),
@@ -90,6 +95,48 @@ class _SettingsPageState extends State<SettingsPage> {
         const Padding(
           padding: EdgeInsets.only(bottom: 16.0),
           child: Text(
+            '主题设置',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ListTile(
+          title: const Text('主题颜色'),
+          subtitle: const Text('选择应用的主题配色'),
+          trailing: Wrap(
+            spacing: 8,
+            children: AppProvider.presetColors.map((color) {
+              final isSelected = _themeColor.value == color.value;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _themeColor = color;
+                  });
+                },
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, size: 20, color: Colors.white)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const Divider(),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16.0),
+          child: Text(
             '编辑器悬浮菜单',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
@@ -124,88 +171,88 @@ class _SettingsPageState extends State<SettingsPage> {
    */
   Widget _buildApiSettings() {
     return ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: _editingConfigs.length,
-        itemBuilder: (context, index) {
-          final config = _editingConfigs[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16.0),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        config.provider.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+      padding: const EdgeInsets.all(16.0),
+      itemCount: _editingConfigs.length,
+      itemBuilder: (context, index) {
+        final config = _editingConfigs[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      config.provider.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      Switch(
-                        value: config.isEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            config.isEnabled = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: 'API Key / Access Token',
-                      border: OutlineInputBorder(),
                     ),
-                    controller: TextEditingController(text: config.apiKey)
-                      ..selection = TextSelection.fromPosition(
-                        TextPosition(offset: config.apiKey.length),
-                      ),
-                    onChanged: (value) {
-                      config.apiKey = value;
-                    },
-                    obscureText: true, // 隐藏敏感信息
-                  ),
-                  if (config.provider == 'baidu') ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'App ID',
-                        border: OutlineInputBorder(),
-                      ),
-                      controller: TextEditingController(text: config.appId)
-                        ..selection = TextSelection.fromPosition(
-                          TextPosition(offset: config.appId?.length ?? 0),
-                        ),
+                    Switch(
+                      value: config.isEnabled,
                       onChanged: (value) {
-                        config.appId = value;
+                        setState(() {
+                          config.isEnabled = value;
+                        });
                       },
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'API Key / Access Token',
+                    border: OutlineInputBorder(),
+                  ),
+                  controller: TextEditingController(text: config.apiKey)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: config.apiKey.length),
+                    ),
+                  onChanged: (value) {
+                    config.apiKey = value;
+                  },
+                  obscureText: true, // 隐藏敏感信息
+                ),
+                if (config.provider == 'baidu') ...[
                   const SizedBox(height: 16),
                   TextField(
                     decoration: const InputDecoration(
-                      labelText: '自定义 Endpoint (可选)',
+                      labelText: 'App ID',
                       border: OutlineInputBorder(),
-                      hintText: 'https://api.example.com/v1',
                     ),
-                    controller: TextEditingController(text: config.endpoint)
+                    controller: TextEditingController(text: config.appId)
                       ..selection = TextSelection.fromPosition(
-                        TextPosition(offset: config.endpoint?.length ?? 0),
+                        TextPosition(offset: config.appId?.length ?? 0),
                       ),
                     onChanged: (value) {
-                      config.endpoint = value;
+                      config.appId = value;
                     },
                   ),
                 ],
-              ),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: '自定义 Endpoint (可选)',
+                    border: OutlineInputBorder(),
+                    hintText: 'https://api.example.com/v1',
+                  ),
+                  controller: TextEditingController(text: config.endpoint)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: config.endpoint?.length ?? 0),
+                    ),
+                  onChanged: (value) {
+                    config.endpoint = value;
+                  },
+                ),
+              ],
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
   }
 }

@@ -63,13 +63,13 @@ class KKMarkdownApp extends StatelessWidget {
           title: 'KKMarkdown',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+            colorScheme: ColorScheme.fromSeed(seedColor: appProvider.themeColor),
             useMaterial3: true,
             brightness: Brightness.light,
           ),
           darkTheme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
+              seedColor: appProvider.themeColor,
               brightness: Brightness.dark,
             ),
             useMaterial3: true,

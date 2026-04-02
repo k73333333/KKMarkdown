@@ -13,6 +13,21 @@ class AppProvider with ChangeNotifier {
   /** 当前主题模式 */
   ThemeMode _themeMode = ThemeMode.system;
 
+  /** 当前的主题色 */
+  Color _themeColor = Colors.blue;
+
+  /** 支持的主题色预设列表 */
+  static const List<Color> presetColors = [
+    Colors.blue,
+    Colors.green,
+    Colors.purple,
+    Colors.orange,
+    Colors.red,
+    Colors.teal,
+    Colors.indigo,
+    Colors.brown,
+  ];
+
   /** 翻译配置列表 */
   List<TranslationConfig> _translationConfigs = [];
 
@@ -28,10 +43,15 @@ class AppProvider with ChangeNotifier {
   /** 当前打开的文件绝对路径 */
   String? _currentFilePath;
 
-  /** 
+  /**
    * 获取当前主题模式
    */
   ThemeMode get themeMode => _themeMode;
+
+  /**
+   * 获取当前主题颜色
+   */
+  Color get themeColor => _themeColor;
 
   /**
    * 获取翻译配置列表
@@ -69,6 +89,12 @@ class AppProvider with ChangeNotifier {
       // 加载主题配置
       final themeIndex = prefs.getInt('themeMode') ?? 0;
       _themeMode = ThemeMode.values[themeIndex];
+
+      // 加载主题色
+      final colorValue = prefs.getInt('themeColor');
+      if (colorValue != null) {
+        _themeColor = Color(colorValue);
+      }
 
       // 加载翻译配置
       final configJson = prefs.getString('translationConfigs');
@@ -151,6 +177,22 @@ class AppProvider with ChangeNotifier {
       await prefs.setInt('themeMode', mode.index);
     } catch (e) {
       Logger.error('保存主题配置失败', e);
+    }
+  }
+
+  /**
+   * 切换主题色
+   * @param color 新的主题色
+   */
+  Future<void> setThemeColor(Color color) async {
+    _themeColor = color;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('themeColor', color.value);
+    } catch (e) {
+      Logger.error('保存主题色配置失败', e);
     }
   }
 

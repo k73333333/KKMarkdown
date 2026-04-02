@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -14,6 +14,7 @@ import 'package:pasteboard/pasteboard.dart';
 import '../providers/app_provider.dart';
 import '../api/translation_manager.dart';
 import '../utils/logger.dart';
+import '../utils/markdown_highlighter.dart';
 import 'settings_page.dart';
 
 /**
@@ -85,12 +86,11 @@ class MarkdownTextEditingController extends TextEditingController {
 
     int lastMatchEnd = 0;
     for (final Match match in imageRegExp.allMatches(text)) {
-      // 添加匹配前的普通文本
+      // 添加匹配前的普通文本（交给语法高亮解析器处理）
       if (match.start > lastMatchEnd) {
-        children.add(TextSpan(
-          text: text.substring(lastMatchEnd, match.start),
-          style: style,
-        ));
+        final normalText = text.substring(lastMatchEnd, match.start);
+        children
+            .addAll(MarkdownHighlighter.highlight(normalText, context, style));
       }
 
       final String altText = match.group(1) ?? '图片';
@@ -141,12 +141,11 @@ class MarkdownTextEditingController extends TextEditingController {
       lastMatchEnd = match.end;
     }
 
-    // 添加剩余的文本
+    // 添加剩余的文本（交给语法高亮解析器处理）
     if (lastMatchEnd < text.length) {
-      children.add(TextSpan(
-        text: text.substring(lastMatchEnd),
-        style: style,
-      ));
+      final normalText = text.substring(lastMatchEnd);
+      children
+          .addAll(MarkdownHighlighter.highlight(normalText, context, style));
     }
 
     return TextSpan(style: style, children: children);
@@ -1062,35 +1061,38 @@ class _HomePageState extends State<HomePage> with WindowListener {
                         padding: const EdgeInsets.all(16.0),
                         color: Theme.of(context).scaffoldBackgroundColor,
                         child: SelectionArea(
-                          child: Markdown(
+                          child: MarkdownWidget(
                             data: _controller.text,
                             selectable: false,
-                            imageBuilder: (uri, title, alt) {
-                              String imageUrl = uri.toString();
-                              String imageId = imageUrl;
-                              if (imageUrl.startsWith('img_')) {
-                                imageUrl =
-                                    _imageBase64Cache[imageUrl] ?? imageUrl;
-                              }
-                              return MouseRegion(
-                                cursor: SystemMouseCursors.click,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    _showImagePreviewDialog(
-                                        imageId, alt ?? '图片');
-                                  },
-                                  child: imageUrl.startsWith('data:image')
-                                      ? Image.memory(
-                                          base64Decode(
-                                              imageUrl.split(',').last),
-                                        )
-                                      : Image.network(imageUrl),
-                                ),
-                              );
-                            },
-                            onTapText: () {
-                              // 点击文本事件
-                            },
+                            config:
+                                (Theme.of(context).brightness == Brightness.dark
+                                        ? MarkdownConfig.darkConfig
+                                        : MarkdownConfig.defaultConfig)
+                                    .copy(configs: [
+                              ImgConfig(builder: (String imageUrl,
+                                  Map<String, String> attributes) {
+                                String imageId = imageUrl;
+                                if (imageUrl.startsWith('img_')) {
+                                  imageUrl =
+                                      _imageBase64Cache[imageUrl] ?? imageUrl;
+                                }
+                                final alt = attributes['alt'] ?? '图片';
+                                return MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      _showImagePreviewDialog(imageId, alt);
+                                    },
+                                    child: imageUrl.startsWith('data:image')
+                                        ? Image.memory(
+                                            base64Decode(
+                                                imageUrl.split(',').last),
+                                          )
+                                        : Image.network(imageUrl),
+                                  ),
+                                );
+                              })
+                            ]),
                           ),
                           contextMenuBuilder: (BuildContext context,
                               SelectableRegionState selectableRegionState) {

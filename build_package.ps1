@@ -1,4 +1,4 @@
-﻿﻿# 一键构建并打包 KKMarkdown Windows 客户端。
+﻿# 一键构建并打包 KKMarkdown Windows 客户端。
 #
 # 该脚本将执行以下操作：
 # 1. 编译 Flutter Windows Release 版本。

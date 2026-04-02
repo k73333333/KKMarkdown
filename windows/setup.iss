@@ -50,26 +50,58 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// 自定义 Pascal Script 逻辑
+// 自定义 Pascal Script 逻辑：优先非 C 盘的其它盘符进行安装（C 盘优先级最低）
 function GetInstallDir(Param: String): String;
 var
-  SystemDrive: String;
+  DriveLetterCh: String;
+  TestPath: String;
   AutoPfPath: String;
+  TargetDrive: String;
+  i: Integer;
 begin
-  // 获取系统盘符 (通常为 C:)
-  SystemDrive := ExpandConstant('{sysdrive}');
-  // 获取默认的 Program Files 路径 (可能是 D:\Program Files，由用户系统配置决定)
   AutoPfPath := ExpandConstant('{autopf}');
-  
-  // 如果默认 Program Files 恰好是 D 盘，则强制改回系统盘(C盘)的 Program Files 
-  if (Uppercase(Copy(AutoPfPath, 1, 2)) = 'D:') then
+  TargetDrive := '';
+
+  // 从 D 盘开始遍历到 Z 盘，寻找第一个有效且可写的本地磁盘
+  for i := Ord('D') to Ord('Z') do
   begin
-    // 替换盘符为系统盘，保留后缀路径
-    Result := SystemDrive + Copy(AutoPfPath, 3, Length(AutoPfPath)) + '\{#MyAppName}';
+    DriveLetterCh := Chr(i);
+    TestPath := DriveLetterCh + ':\';
+    // 简单检查该根目录是否存在
+    if DirExists(TestPath) then
+    begin
+      TargetDrive := DriveLetterCh + ':';
+      break;
+    end;
+  end;
+
+  // 如果 D-Z 都没有找到可用的盘符，那就只能妥协使用 C 盘（优先级最低）
+  if TargetDrive = '' then
+  begin
+    TargetDrive := 'C:';
+    // 如果系统默认路径（AutoPfPath）包含其他盘符前缀（例如 D:），将它强行改成 C:
+    if (Length(AutoPfPath) >= 2) and (AutoPfPath[2] = ':') then
+    begin
+      Result := TargetDrive + Copy(AutoPfPath, 3, Length(AutoPfPath)) + '\{#MyAppName}';
+    end
+    else
+    begin
+      // 否则直接拼接（防止没有盘符的异常路径）
+      Result := AutoPfPath + '\{#MyAppName}';
+    end;
   end
   else
   begin
-    // 如果不是 D 盘，使用系统默认的 Program Files
-    Result := AutoPfPath + '\{#MyAppName}';
+    // 找到了 D-Z 之间的盘符，替换原有路径中的盘符
+    // 例如：C:\Program Files (x86) -> D:\Program Files (x86)
+    if (Length(AutoPfPath) >= 2) and (AutoPfPath[2] = ':') then
+    begin
+      Result := TargetDrive + Copy(AutoPfPath, 3, Length(AutoPfPath)) + '\{#MyAppName}';
+    end
+    else
+    begin
+      // Fallback
+      Result := TargetDrive + '\Program Files\{#MyAppName}';
+    end;
   end;
 end;

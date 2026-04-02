@@ -19,6 +19,12 @@ class AppProvider with ChangeNotifier {
   /** 当前选中的翻译服务商 */
   String _selectedProvider = 'baidu';
 
+  /** 是否显示划词翻译按钮 */
+  bool _showTranslationButton = false;
+
+  /** 是否显示文本朗读按钮 */
+  bool _showTtsButton = false;
+
   /** 当前打开的文件绝对路径 */
   String? _currentFilePath;
 
@@ -36,6 +42,16 @@ class AppProvider with ChangeNotifier {
    * 获取当前选中的翻译服务商
    */
   String get selectedProvider => _selectedProvider;
+
+  /**
+   * 是否显示划词翻译按钮
+   */
+  bool get showTranslationButton => _showTranslationButton;
+
+  /**
+   * 是否显示文本朗读按钮
+   */
+  bool get showTtsButton => _showTtsButton;
 
   /**
    * 获取当前打开的文件绝对路径
@@ -85,6 +101,10 @@ class AppProvider with ChangeNotifier {
 
       // 加载选中的服务商
       _selectedProvider = prefs.getString('selectedProvider') ?? 'baidu';
+
+      // 加载按钮显示状态
+      _showTranslationButton = prefs.getBool('showTranslationButton') ?? false;
+      _showTtsButton = prefs.getBool('showTtsButton') ?? false;
 
       // 同步配置到 TranslationManager
       _syncToTranslationManager();
@@ -161,6 +181,34 @@ class AppProvider with ChangeNotifier {
     _syncToTranslationManager();
     notifyListeners();
     _saveTranslationConfigs();
+  }
+
+  /**
+   * 设置是否显示划词翻译按钮
+   */
+  Future<void> setShowTranslationButton(bool show) async {
+    _showTranslationButton = show;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('showTranslationButton', show);
+    } catch (e) {
+      Logger.error('保存翻译按钮状态失败', e);
+    }
+  }
+
+  /**
+   * 设置是否显示文本朗读按钮
+   */
+  Future<void> setShowTtsButton(bool show) async {
+    _showTtsButton = show;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('showTtsButton', show);
+    } catch (e) {
+      Logger.error('保存朗读按钮状态失败', e);
+    }
   }
 
   /**

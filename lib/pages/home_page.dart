@@ -779,11 +779,6 @@ class _HomePageState extends State<HomePage> {
                 tooltip: '另存为',
                 onPressed: _saveAsFile,
               ),
-              IconButton(
-                icon: const Icon(Icons.image),
-                tooltip: '插入图片',
-                onPressed: _insertImageFromFile,
-              ),
               const SizedBox(width: 16),
               // 视图切换按钮组
               Padding(
@@ -957,43 +952,125 @@ class _HomePageState extends State<HomePage> {
                       ),
                       contextMenuBuilder: (BuildContext context,
                           SelectableRegionState selectableRegionState) {
+                        final appProvider =
+                            Provider.of<AppProvider>(context, listen: false);
+                        final providerName = appProvider.selectedProvider;
+                        final configs = appProvider.translationConfigs;
+
+                        final currentConfig = configs.firstWhere(
+                          (c) => c.provider == providerName,
+                          orElse: () => configs.first,
+                        );
+
+                        // 检查 API 配置是否有效
+                        bool isApiValid = currentConfig.apiKey.isNotEmpty;
+                        if (providerName == 'baidu') {
+                          isApiValid = currentConfig.apiKey.isNotEmpty &&
+                              currentConfig.appId != null &&
+                              currentConfig.appId!.isNotEmpty;
+                        }
+
+                        final buttonItems =
+                            selectableRegionState.contextMenuButtonItems;
+
+                        if (appProvider.showTranslationButton) {
+                          buttonItems.add(ContextMenuButtonItem(
+                            onPressed: () {
+                              if (!isApiValid) {
+                                // 未配置 API 时弹出提示
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('提示'),
+                                    content: const Text(
+                                        '当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('取消'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context); // 关闭弹窗
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const SettingsPage()),
+                                          );
+                                        },
+                                        child: const Text('前往配置'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                selectableRegionState.hideToolbar();
+                                return;
+                              }
+
+                              final text = selectableRegionState
+                                  .textEditingValue.selection
+                                  .textInside(selectableRegionState
+                                      .textEditingValue.text);
+                              _translate(text);
+                              selectableRegionState.hideToolbar();
+                            },
+                            label: '翻译',
+                          ));
+                        }
+
+                        if (appProvider.showTtsButton) {
+                          buttonItems.add(ContextMenuButtonItem(
+                            onPressed: () {
+                              if (!isApiValid) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('提示'),
+                                    content: const Text(
+                                        '使用文本朗读功能前，请前往设置配置 API Key。'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('取消'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const SettingsPage()),
+                                          );
+                                        },
+                                        child: const Text('前往配置'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                selectableRegionState.hideToolbar();
+                                return;
+                              }
+                              final text = selectableRegionState
+                                  .textEditingValue.selection
+                                  .textInside(selectableRegionState
+                                      .textEditingValue.text);
+                              _speak(text);
+                              selectableRegionState.hideToolbar();
+                            },
+                            label: '▶ 播放',
+                          ));
+                        }
+
                         return AdaptiveTextSelectionToolbar.buttonItems(
                           anchors: selectableRegionState.contextMenuAnchors,
-                          buttonItems: [
-                            ...selectableRegionState.contextMenuButtonItems,
-                            ContextMenuButtonItem(
-                              onPressed: () {
-                                final text = selectableRegionState
-                                    .textEditingValue.selection
-                                    .textInside(selectableRegionState
-                                        .textEditingValue.text);
-                                _translate(text);
-                                selectableRegionState.hideToolbar();
-                              },
-                              label: '翻译',
-                            ),
-                            ContextMenuButtonItem(
-                              onPressed: () {
-                                final text = selectableRegionState
-                                    .textEditingValue.selection
-                                    .textInside(selectableRegionState
-                                        .textEditingValue.text);
-                                _speak(text);
-                                selectableRegionState.hideToolbar();
-                              },
-                              label: '▶ 播放',
-                            ),
-                          ],
+                          buttonItems: buttonItems,
                         );
                       },
                     ),
                   ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.image),
-                tooltip: '插入图片',
-                onPressed: _insertImageFromFile,
-              ),
             ],
           ),
         );

@@ -156,6 +156,10 @@ class _HomePageState extends State<HomePage> with WindowListener {
   /** 当前的视图模式 */
   ViewMode _viewMode = ViewMode.split;
 
+  final TocController _tocController = TocController();
+
+  bool _isTocExpanded = true;
+
   /** 窗口是否最大化 */
   bool _isMaximized = false;
 
@@ -250,6 +254,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    _tocController.dispose();
     _controller.dispose();
     _focusNode.dispose();
     _flutterTts.stop();
@@ -1060,38 +1065,139 @@ class _HomePageState extends State<HomePage> with WindowListener {
                         padding: const EdgeInsets.all(16.0),
                         color: Theme.of(context).scaffoldBackgroundColor,
                         child: SelectionArea(
-                          child: MarkdownWidget(
-                            data: _controller.text,
-                            selectable: false,
-                            config:
-                                (Theme.of(context).brightness == Brightness.dark
-                                        ? MarkdownConfig.darkConfig
-                                        : MarkdownConfig.defaultConfig)
-                                    .copy(configs: [
-                              ImgConfig(builder: (String imageUrl,
-                                  Map<String, String> attributes) {
-                                String imageId = imageUrl;
-                                if (imageUrl.startsWith('img_')) {
-                                  imageUrl =
-                                      _imageBase64Cache[imageUrl] ?? imageUrl;
-                                }
-                                final alt = attributes['alt'] ?? '图片';
-                                return MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      _showImagePreviewDialog(imageId, alt);
-                                    },
-                                    child: imageUrl.startsWith('data:image')
-                                        ? Image.memory(
-                                            base64Decode(
-                                                imageUrl.split(',').last),
-                                          )
-                                        : Image.network(imageUrl),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_isTocExpanded)
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 260,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    border: Border.all(
+                                      color: Theme.of(context).dividerColor,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                );
-                              })
-                            ]),
+                                  child: Column(
+                                    children: [
+                                      SizedBox(
+                                        height: 40,
+                                        child: Row(
+                                          children: [
+                                            const SizedBox(width: 12),
+                                            const Text(
+                                              '目录',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            IconButton(
+                                              tooltip: '收起目录',
+                                              onPressed: () {
+                                                setState(() {
+                                                  _isTocExpanded = false;
+                                                });
+                                              },
+                                              icon: const Icon(
+                                                  Icons.chevron_left),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Divider(
+                                        height: 1,
+                                        color: Theme.of(context).dividerColor,
+                                      ),
+                                      Expanded(
+                                        child: TocWidget(
+                                          controller: _tocController,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          tocTextStyle: TextStyle(
+                                            fontSize: 14,
+                                            color: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.color,
+                                          ),
+                                          currentTocTextStyle: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                // 目录收起时，只保留一个圆形展开按钮
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Material(
+                                      elevation: 2,
+                                      shape: const CircleBorder(),
+                                      clipBehavior: Clip.antiAlias,
+                                      color: Theme.of(context).cardColor,
+                                      child: IconButton(
+                                        tooltip: '展开目录',
+                                        onPressed: () {
+                                          setState(() {
+                                            _isTocExpanded = true;
+                                          });
+                                        },
+                                        icon: const Icon(
+                                            Icons.format_list_bulleted),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: MarkdownWidget(
+                                  data: _controller.text,
+                                  tocController: _tocController,
+                                  selectable: false,
+                                  config: (Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? MarkdownConfig.darkConfig
+                                          : MarkdownConfig.defaultConfig)
+                                      .copy(configs: [
+                                    ImgConfig(builder: (String imageUrl,
+                                        Map<String, String> attributes) {
+                                      String imageId = imageUrl;
+                                      if (imageUrl.startsWith('img_')) {
+                                        imageUrl =
+                                            _imageBase64Cache[imageUrl] ??
+                                                imageUrl;
+                                      }
+                                      final alt = attributes['alt'] ?? '图片';
+                                      return MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            _showImagePreviewDialog(
+                                                imageId, alt);
+                                          },
+                                          child: imageUrl
+                                                  .startsWith('data:image')
+                                              ? Image.memory(
+                                                  base64Decode(
+                                                      imageUrl.split(',').last),
+                                                )
+                                              : Image.network(imageUrl),
+                                        ),
+                                      );
+                                    })
+                                  ]),
+                                ),
+                              ),
+                            ],
                           ),
                           contextMenuBuilder: (BuildContext context,
                               SelectableRegionState selectableRegionState) {

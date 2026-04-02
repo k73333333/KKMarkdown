@@ -27,11 +27,13 @@ void main() async {
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
-      title: 'KKMarkdown',
+      titleBarStyle: TitleBarStyle.hidden, // 隐藏系统标题栏，但保留系统的窗口控制按钮（最小化、最大化、关闭）
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
+      // 防止因为隐藏标题栏导致窗口默认太小或没有最大化按钮
+      await windowManager.setPreventClose(false);
     });
   } catch (e) {
     Logger.warn('窗口管理器初始化失败 (非桌面环境可忽略): $e');

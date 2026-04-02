@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:pasteboard/pasteboard.dart';
@@ -17,7 +18,7 @@ import 'settings_page.dart';
 
 /**
  * 主页
- * 包含 Markdown 编辑区和预览区
+ * 包含 Markdown 编辑区和预览区 
  */
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -152,9 +153,18 @@ class MarkdownTextEditingController extends TextEditingController {
   }
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WindowListener {
   /** 当前的视图模式 */
   ViewMode _viewMode = ViewMode.split;
+
+  /** 窗口是否最大化 */
+  bool _isMaximized = false;
+
+  /** 窗口是否全屏 */
+  bool _isFullScreen = false;
+
+  /** 双屏模式下左侧编辑区占据的宽度比例（0.1 到 0.9 之间） */
+  double _editAreaRatio = 0.5;
 
   /** Markdown 文本内容 */
   late final MarkdownTextEditingController _controller;
@@ -187,10 +197,61 @@ class _HomePageState extends State<HomePage> {
     // 设置默认示例文本
     _controller.text =
         '# 欢迎使用 KKMarkdown\n\n这是一个轻量级的 Markdown 编辑器。\n\n## 功能特点\n- 实时预览\n- 划词翻译\n- 文本朗读\n\n试着选中这段文字看看！';
+
+    // 监听窗口最大化状态
+    windowManager.addListener(this);
+    _initWindowState();
+  }
+
+  Future<void> _initWindowState() async {
+    bool isMaximized = await windowManager.isMaximized();
+    if (mounted) {
+      setState(() {
+        _isMaximized = isMaximized;
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 动态同步系统的标题栏按钮颜色（暗色/亮色）以确保原生按钮可见
+    final Brightness brightness = Theme.of(context).brightness;
+    // 使用 windowManager.setBrightness 设置原生按钮的亮度，Light 则按钮为黑色，Dark 则为白色
+    windowManager.setBrightness(brightness);
+  }
+
+  @override
+  void onWindowMaximize() {
+    setState(() {
+      _isMaximized = true;
+    });
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    setState(() {
+      _isMaximized = false;
+    });
+  }
+
+  @override
+  void onWindowEnterFullScreen() {
+    setState(() {
+      _isFullScreen = true;
+    });
+  }
+
+  @override
+  void onWindowLeaveFullScreen() {
+    setState(() {
+      _isFullScreen = false;
+    });
   }
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _controller.dispose();
     _focusNode.dispose();
     _flutterTts.stop();
@@ -760,318 +821,404 @@ class _HomePageState extends State<HomePage> {
             : '未命名';
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text('KKMarkdown - $fileName'),
-            actions: [
-              // 文件操作按钮组
-              IconButton(
-                icon: const Icon(Icons.folder_open),
-                tooltip: '打开文件',
-                onPressed: _openFile,
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: GestureDetector(
+              onPanStart: (details) {
+                windowManager.startDragging();
+              },
+              onDoubleTap: () async {
+                if (await windowManager.isMaximized()) {
+                  windowManager.unmaximize();
+                } else {
+                  windowManager.maximize();
+                }
+              },
+              child: AppBar(
+                title: Text('KKMarkdown - $fileName'),
+                actions: [
+                  // 文件操作按钮组
+                  IconButton(
+                    icon: const Icon(Icons.folder_open),
+                    tooltip: '打开文件',
+                    onPressed: _openFile,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save),
+                    tooltip: '保存',
+                    onPressed: _saveFile,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save_as),
+                    tooltip: '另存为',
+                    onPressed: _saveAsFile,
+                  ),
+                  const SizedBox(width: 16),
+                  // 视图切换按钮组
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: ToggleButtons(
+                      borderRadius: BorderRadius.circular(8.0),
+                      isSelected: [
+                        _viewMode == ViewMode.edit,
+                        _viewMode == ViewMode.split,
+                        _viewMode == ViewMode.preview,
+                      ],
+                      onPressed: (int index) {
+                        setState(() {
+                          if (index == 0) _viewMode = ViewMode.edit;
+                          if (index == 1) _viewMode = ViewMode.split;
+                          if (index == 2) _viewMode = ViewMode.preview;
+                        });
+                      },
+                      children: const [
+                        Tooltip(
+                            message: '仅编辑',
+                            child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Icon(Icons.edit))),
+                        Tooltip(
+                            message: '双屏预览',
+                            child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Icon(Icons.vertical_split))),
+                        Tooltip(
+                            message: '仅预览',
+                            child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Icon(Icons.visibility))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    tooltip: '设置',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingsPage()),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 16),
+                  // 手动增加最小化、全屏、还原按钮（黑色系/主题色，清晰可见）
+                  IconButton(
+                    icon: const Icon(Icons.minimize),
+                    tooltip: '最小化',
+                    onPressed: () => windowManager.minimize(),
+                  ),
+                  IconButton(
+                    icon: Icon(_isFullScreen
+                        ? Icons.fullscreen_exit
+                        : Icons.fullscreen),
+                    tooltip: _isFullScreen ? '退出全屏' : '全屏',
+                    onPressed: () async {
+                      if (_isFullScreen) {
+                        windowManager.setFullScreen(false);
+                      } else {
+                        windowManager.setFullScreen(true);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: '关闭',
+                    color: Colors.red,
+                    onPressed: () => windowManager.close(),
+                  ),
+                  // 为了避免遮挡系统自带的右上角控制按钮（TitleBarStyle.hidden 模式下系统会保留右上角的最小化/最大化/关闭），
+                  // 在最右侧留出足够的空白区域
+                  const SizedBox(width: 10),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.save),
-                tooltip: '保存',
-                onPressed: _saveFile,
-              ),
-              IconButton(
-                icon: const Icon(Icons.save_as),
-                tooltip: '另存为',
-                onPressed: _saveAsFile,
-              ),
-              const SizedBox(width: 16),
-              // 视图切换按钮组
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: ToggleButtons(
-                  borderRadius: BorderRadius.circular(8.0),
-                  isSelected: [
-                    _viewMode == ViewMode.edit,
-                    _viewMode == ViewMode.split,
-                    _viewMode == ViewMode.preview,
-                  ],
-                  onPressed: (int index) {
-                    setState(() {
-                      if (index == 0) _viewMode = ViewMode.edit;
-                      if (index == 1) _viewMode = ViewMode.split;
-                      if (index == 2) _viewMode = ViewMode.preview;
-                    });
-                  },
-                  children: const [
-                    Tooltip(
-                        message: '仅编辑',
-                        child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Icon(Icons.edit))),
-                    Tooltip(
-                        message: '双屏预览',
-                        child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Icon(Icons.vertical_split))),
-                    Tooltip(
-                        message: '仅预览',
-                        child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Icon(Icons.visibility))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              IconButton(
-                icon: const Icon(Icons.settings),
-                tooltip: '设置',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const SettingsPage()),
-                  );
-                },
-              ),
-            ],
+            ),
           ),
-          body: Row(
-            children: [
-              // 左侧编辑区
-              if (_viewMode == ViewMode.edit || _viewMode == ViewMode.split)
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    color: Theme.of(context).cardColor,
-                    child: KeyboardListener(
-                      focusNode: _focusNode,
-                      onKeyEvent: (KeyEvent event) {
-                        try {
-                          // 监听 Ctrl+V (Windows/Linux) 或 Cmd+V (Mac)
-                          // 使用 HardwareKeyboard 的 isControlPressed 配合 KeyDownEvent 时，
-                          // 某些系统键盘可能会抛出状态不同步异常，我们捕获它防止崩溃
-                          if (event is KeyDownEvent &&
-                              event.logicalKey == LogicalKeyboardKey.keyV) {
-                            if (HardwareKeyboard.instance.isControlPressed ||
-                                HardwareKeyboard.instance.isMetaPressed) {
-                              _handlePaste();
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              return Row(
+                children: [
+                  // 左侧编辑区
+                  if (_viewMode == ViewMode.edit || _viewMode == ViewMode.split)
+                    SizedBox(
+                      width: _viewMode == ViewMode.split
+                          ? constraints.maxWidth * _editAreaRatio
+                          : constraints.maxWidth,
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        color: Theme.of(context).cardColor,
+                        child: KeyboardListener(
+                          focusNode: _focusNode,
+                          onKeyEvent: (KeyEvent event) {
+                            try {
+                              // 监听 Ctrl+V (Windows/Linux) 或 Cmd+V (Mac)
+                              // 使用 HardwareKeyboard 的 isControlPressed 配合 KeyDownEvent 时，
+                              // 某些系统键盘可能会抛出状态不同步异常，我们捕获它防止崩溃
+                              if (event is KeyDownEvent &&
+                                  event.logicalKey == LogicalKeyboardKey.keyV) {
+                                if (HardwareKeyboard
+                                        .instance.isControlPressed ||
+                                    HardwareKeyboard.instance.isMetaPressed) {
+                                  _handlePaste();
+                                }
+                              }
+                            } catch (e) {
+                              Logger.error('键盘事件处理异常', e);
                             }
-                          }
-                        } catch (e) {
-                          Logger.error('键盘事件处理异常', e);
-                        }
-                      },
-                      child: TextField(
-                        controller: _controller,
-                        maxLines: null,
-                        expands: true,
-                        style: const TextStyle(
-                            fontFamily: 'Consolas', fontSize: 14),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: '在此输入 Markdown 内容...',
-                        ),
-                        onChanged: (text) {
-                          // 如果用户直接粘贴了完整的 base64，自动转换为短 ID
-                          final RegExp base64RegExp = RegExp(
-                              r'!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^\)]+)\)');
-                          if (base64RegExp.hasMatch(text)) {
-                            final newText =
-                                text.replaceAllMapped(base64RegExp, (match) {
-                              final alt = match.group(1) ?? '图片';
-                              final base64 = match.group(2)!;
-                              final imageId =
-                                  'img_${DateTime.now().millisecondsSinceEpoch}_${match.start}';
-                              _imageBase64Cache[imageId] = base64;
-                              return '![$alt]($imageId)';
-                            });
-
-                            _controller.value = TextEditingValue(
-                              text: newText,
-                              selection: TextSelection.collapsed(
-                                  offset: newText.length),
-                            );
-                          } else {
-                            setState(() {}); // 触发预览更新
-                          }
-                        },
-                        contextMenuBuilder: (context, editableTextState) {
-                          final List<ContextMenuButtonItem> buttonItems =
-                              editableTextState.contextMenuButtonItems;
-
-                          // 在原生菜单项后面插入一个“插入图片”选项
-                          buttonItems.add(ContextMenuButtonItem(
-                            onPressed: () {
-                              _insertImageFromFile();
-                              editableTextState.hideToolbar();
-                            },
-                            label: '插入图片',
-                          ));
-
-                          return AdaptiveTextSelectionToolbar.buttonItems(
-                            anchors: editableTextState.contextMenuAnchors,
-                            buttonItems: buttonItems,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              // 分割线
-              if (_viewMode == ViewMode.split) const VerticalDivider(width: 1),
-              // 右侧预览区
-              if (_viewMode == ViewMode.preview || _viewMode == ViewMode.split)
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: SelectionArea(
-                      child: Markdown(
-                        data: _controller.text,
-                        selectable: false,
-                        imageBuilder: (uri, title, alt) {
-                          String imageUrl = uri.toString();
-                          String imageId = imageUrl;
-                          if (imageUrl.startsWith('img_')) {
-                            imageUrl = _imageBase64Cache[imageUrl] ?? imageUrl;
-                          }
-                          return MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () {
-                                _showImagePreviewDialog(imageId, alt ?? '图片');
-                              },
-                              child: imageUrl.startsWith('data:image')
-                                  ? Image.memory(
-                                      base64Decode(imageUrl.split(',').last),
-                                    )
-                                  : Image.network(imageUrl),
+                          },
+                          child: TextField(
+                            controller: _controller,
+                            maxLines: null,
+                            expands: true,
+                            style: const TextStyle(
+                                fontFamily: 'Consolas', fontSize: 14),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: '在此输入 Markdown 内容...',
                             ),
-                          );
-                        },
-                        onTapText: () {
-                          // 点击文本事件
-                        },
+                            onChanged: (text) {
+                              // 如果用户直接粘贴了完整的 base64，自动转换为短 ID
+                              final RegExp base64RegExp = RegExp(
+                                  r'!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^\)]+)\)');
+                              if (base64RegExp.hasMatch(text)) {
+                                final newText = text
+                                    .replaceAllMapped(base64RegExp, (match) {
+                                  final alt = match.group(1) ?? '图片';
+                                  final base64 = match.group(2)!;
+                                  final imageId =
+                                      'img_${DateTime.now().millisecondsSinceEpoch}_${match.start}';
+                                  _imageBase64Cache[imageId] = base64;
+                                  return '![$alt]($imageId)';
+                                });
+
+                                _controller.value = TextEditingValue(
+                                  text: newText,
+                                  selection: TextSelection.collapsed(
+                                      offset: newText.length),
+                                );
+                              } else {
+                                setState(() {}); // 触发预览更新
+                              }
+                            },
+                            contextMenuBuilder: (context, editableTextState) {
+                              final List<ContextMenuButtonItem> buttonItems =
+                                  editableTextState.contextMenuButtonItems;
+
+                              // 在原生菜单项后面插入一个“插入图片”选项
+                              buttonItems.add(ContextMenuButtonItem(
+                                onPressed: () {
+                                  _insertImageFromFile();
+                                  editableTextState.hideToolbar();
+                                },
+                                label: '插入图片',
+                              ));
+
+                              return AdaptiveTextSelectionToolbar.buttonItems(
+                                anchors: editableTextState.contextMenuAnchors,
+                                buttonItems: buttonItems,
+                              );
+                            },
+                          ),
+                        ),
                       ),
-                      contextMenuBuilder: (BuildContext context,
-                          SelectableRegionState selectableRegionState) {
-                        final appProvider =
-                            Provider.of<AppProvider>(context, listen: false);
-                        final providerName = appProvider.selectedProvider;
-                        final configs = appProvider.translationConfigs;
-
-                        final currentConfig = configs.firstWhere(
-                          (c) => c.provider == providerName,
-                          orElse: () => configs.first,
-                        );
-
-                        // 检查 API 配置是否有效
-                        bool isApiValid = currentConfig.apiKey.isNotEmpty;
-                        if (providerName == 'baidu') {
-                          isApiValid = currentConfig.apiKey.isNotEmpty &&
-                              currentConfig.appId != null &&
-                              currentConfig.appId!.isNotEmpty;
-                        }
-
-                        final buttonItems =
-                            selectableRegionState.contextMenuButtonItems;
-
-                        if (appProvider.showTranslationButton) {
-                          buttonItems.add(ContextMenuButtonItem(
-                            onPressed: () {
-                              if (!isApiValid) {
-                                // 未配置 API 时弹出提示
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('提示'),
-                                    content: const Text(
-                                        '当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context); // 关闭弹窗
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const SettingsPage()),
-                                          );
-                                        },
-                                        child: const Text('前往配置'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                selectableRegionState.hideToolbar();
-                                return;
-                              }
-
-                              final text = selectableRegionState
-                                  .textEditingValue.selection
-                                  .textInside(selectableRegionState
-                                      .textEditingValue.text);
-                              _translate(text);
-                              selectableRegionState.hideToolbar();
-                            },
-                            label: '翻译',
-                          ));
-                        }
-
-                        if (appProvider.showTtsButton) {
-                          buttonItems.add(ContextMenuButtonItem(
-                            onPressed: () {
-                              if (!isApiValid) {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('提示'),
-                                    content: const Text(
-                                        '使用文本朗读功能前，请前往设置配置 API Key。'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const SettingsPage()),
-                                          );
-                                        },
-                                        child: const Text('前往配置'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                selectableRegionState.hideToolbar();
-                                return;
-                              }
-                              final text = selectableRegionState
-                                  .textEditingValue.selection
-                                  .textInside(selectableRegionState
-                                      .textEditingValue.text);
-                              _speak(text);
-                              selectableRegionState.hideToolbar();
-                            },
-                            label: '▶ 播放',
-                          ));
-                        }
-
-                        return AdaptiveTextSelectionToolbar.buttonItems(
-                          anchors: selectableRegionState.contextMenuAnchors,
-                          buttonItems: buttonItems,
-                        );
-                      },
                     ),
-                  ),
-                ),
-            ],
+                  // 分割线与拖拽手柄
+                  if (_viewMode == ViewMode.split)
+                    GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onPanUpdate: (details) {
+                        setState(() {
+                          // 计算新的比例，限制在 10% 到 90% 之间防止某一边过小
+                          _editAreaRatio +=
+                              details.delta.dx / constraints.maxWidth;
+                          _editAreaRatio = _editAreaRatio.clamp(0.1, 0.9);
+                        });
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.resizeLeftRight,
+                        child: Container(
+                          width: 8, // 增加热区宽度方便拖拽
+                          color:
+                              Theme.of(context).dividerColor.withOpacity(0.1),
+                          child: Center(
+                            child: Container(
+                              width: 2,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).dividerColor,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 右侧预览区
+                  if (_viewMode == ViewMode.preview ||
+                      _viewMode == ViewMode.split)
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: SelectionArea(
+                          child: Markdown(
+                            data: _controller.text,
+                            selectable: false,
+                            imageBuilder: (uri, title, alt) {
+                              String imageUrl = uri.toString();
+                              String imageId = imageUrl;
+                              if (imageUrl.startsWith('img_')) {
+                                imageUrl =
+                                    _imageBase64Cache[imageUrl] ?? imageUrl;
+                              }
+                              return MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    _showImagePreviewDialog(
+                                        imageId, alt ?? '图片');
+                                  },
+                                  child: imageUrl.startsWith('data:image')
+                                      ? Image.memory(
+                                          base64Decode(
+                                              imageUrl.split(',').last),
+                                        )
+                                      : Image.network(imageUrl),
+                                ),
+                              );
+                            },
+                            onTapText: () {
+                              // 点击文本事件
+                            },
+                          ),
+                          contextMenuBuilder: (BuildContext context,
+                              SelectableRegionState selectableRegionState) {
+                            final appProvider = Provider.of<AppProvider>(
+                                context,
+                                listen: false);
+                            final providerName = appProvider.selectedProvider;
+                            final configs = appProvider.translationConfigs;
+
+                            final currentConfig = configs.firstWhere(
+                              (c) => c.provider == providerName,
+                              orElse: () => configs.first,
+                            );
+
+                            // 检查 API 配置是否有效
+                            bool isApiValid = currentConfig.apiKey.isNotEmpty;
+                            if (providerName == 'baidu') {
+                              isApiValid = currentConfig.apiKey.isNotEmpty &&
+                                  currentConfig.appId != null &&
+                                  currentConfig.appId!.isNotEmpty;
+                            }
+
+                            final buttonItems =
+                                selectableRegionState.contextMenuButtonItems;
+
+                            if (appProvider.showTranslationButton) {
+                              buttonItems.add(ContextMenuButtonItem(
+                                onPressed: () {
+                                  if (!isApiValid) {
+                                    // 未配置 API 时弹出提示
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('提示'),
+                                        content: const Text(
+                                            '当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('取消'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context); // 关闭弹窗
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        const SettingsPage()),
+                                              );
+                                            },
+                                            child: const Text('前往配置'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    selectableRegionState.hideToolbar();
+                                    return;
+                                  }
+
+                                  final text = selectableRegionState
+                                      .textEditingValue.selection
+                                      .textInside(selectableRegionState
+                                          .textEditingValue.text);
+                                  _translate(text);
+                                  selectableRegionState.hideToolbar();
+                                },
+                                label: '翻译',
+                              ));
+                            }
+
+                            if (appProvider.showTtsButton) {
+                              buttonItems.add(ContextMenuButtonItem(
+                                onPressed: () {
+                                  if (!isApiValid) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('提示'),
+                                        content: const Text(
+                                            '使用文本朗读功能前，请前往设置配置 API Key。'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('取消'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        const SettingsPage()),
+                                              );
+                                            },
+                                            child: const Text('前往配置'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    selectableRegionState.hideToolbar();
+                                    return;
+                                  }
+                                  final text = selectableRegionState
+                                      .textEditingValue.selection
+                                      .textInside(selectableRegionState
+                                          .textEditingValue.text);
+                                  _speak(text);
+                                  selectableRegionState.hideToolbar();
+                                },
+                                label: '▶ 播放',
+                              ));
+                            }
+
+                            return AdaptiveTextSelectionToolbar.buttonItems(
+                              anchors: selectableRegionState.contextMenuAnchors,
+                              buttonItems: buttonItems,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         );
       },

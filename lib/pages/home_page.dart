@@ -814,6 +814,421 @@ class _HomePageState extends State<HomePage> with WindowListener {
     });
   }
 
+  /**
+   * 构建工具栏按钮
+   */
+  Widget _buildToolbarButton(BuildContext context, IconData icon,
+      String tooltip, VoidCallback onPressed) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: Tooltip(
+        message: tooltip,
+        child: IconButton(
+          icon: Icon(icon,
+              size: 20,
+              color: Theme.of(context).iconTheme.color?.withOpacity(0.8)),
+          splashRadius: 20,
+          onPressed: onPressed,
+          hoverColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * 构建窗口控制按钮
+   */
+  Widget _buildWindowButton(BuildContext context, IconData icon, String tooltip,
+      VoidCallback onPressed,
+      {bool isClose = false}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        hoverColor: isClose ? Colors.red : Theme.of(context).hoverColor,
+        child: SizedBox(
+          width: 46,
+          height: double.infinity,
+          child: Icon(
+            icon,
+            size: 16,
+            color: isClose
+                ? Colors.red
+                : Theme.of(context).iconTheme.color?.withOpacity(0.8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * 构建左侧编辑器面板
+   */
+  Widget _buildEditorPanel(BuildContext context, bool isDark, Color cardColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20.0),
+      child: KeyboardListener(
+        focusNode: _focusNode,
+        onKeyEvent: (KeyEvent event) {
+          try {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.keyV) {
+              if (HardwareKeyboard.instance.isControlPressed ||
+                  HardwareKeyboard.instance.isMetaPressed) {
+                _handlePaste();
+              }
+            }
+          } catch (e) {
+            Logger.error('键盘事件处理异常', e);
+          }
+        },
+        child: TextField(
+          controller: _controller,
+          maxLines: null,
+          expands: true,
+          style: const TextStyle(
+              fontFamily: 'Consolas', fontSize: 15, height: 1.6),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            hintText: '在此输入 Markdown 内容...',
+          ),
+          onChanged: (text) {
+            final RegExp base64RegExp =
+                RegExp(r'!\[([^\]]*)\]\((data:image/[^;]+;base64,[^\)]+)\)');
+            if (base64RegExp.hasMatch(text)) {
+              final newText = text.replaceAllMapped(base64RegExp, (match) {
+                final alt = match.group(1) ?? '图片';
+                final base64 = match.group(2)!;
+                final imageId =
+                    'img_${DateTime.now().millisecondsSinceEpoch}_${match.start}';
+                _imageBase64Cache[imageId] = base64;
+                return '![$alt]($imageId)';
+              });
+              _controller.value = TextEditingValue(
+                text: newText,
+                selection: TextSelection.collapsed(offset: newText.length),
+              );
+            } else {
+              setState(() {});
+            }
+          },
+          contextMenuBuilder: (context, editableTextState) {
+            final List<ContextMenuButtonItem> buttonItems =
+                editableTextState.contextMenuButtonItems;
+            buttonItems.add(ContextMenuButtonItem(
+              onPressed: () {
+                _insertImageFromFile();
+                editableTextState.hideToolbar();
+              },
+              label: '插入图片',
+            ));
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableTextState.contextMenuAnchors,
+              buttonItems: buttonItems,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * 构建拖拽分割线
+   */
+  Widget _buildSplitter(BoxConstraints constraints, bool isDark) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanUpdate: (details) {
+        setState(() {
+          _editAreaRatio += details.delta.dx / constraints.maxWidth;
+          _editAreaRatio = _editAreaRatio.clamp(0.1, 0.9);
+        });
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeLeftRight,
+        child: SizedBox(
+          width: 16,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Theme.of(context).dividerColor.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * 构建右侧预览面板
+   */
+  Widget _buildPreviewPanel(
+      BuildContext context, bool isDark, Color cardColor) {
+    final dividerColor = Theme.of(context).dividerColor;
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20.0),
+      child: SelectionArea(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isTocExpanded)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                width: 240,
+                margin: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2D2D30)
+                      : const Color(0xFFF9FAFB),
+                  border: Border.all(color: dividerColor.withOpacity(0.2)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 44,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 16),
+                          const Icon(Icons.format_list_bulleted, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('目录',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 14)),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: '收起目录',
+                            splashRadius: 20,
+                            onPressed: () {
+                              setState(() {
+                                _isTocExpanded = false;
+                              });
+                            },
+                            icon: const Icon(Icons.chevron_left, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: dividerColor.withOpacity(0.2)),
+                    Expanded(
+                      child: TocWidget(
+                        controller: _tocController,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 8),
+                        tocTextStyle: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.color
+                              ?.withOpacity(0.8),
+                        ),
+                        currentTocTextStyle: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Tooltip(
+                    message: '展开目录',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        setState(() {
+                          _isTocExpanded = true;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2D2D30)
+                              : const Color(0xFFF9FAFB),
+                          border:
+                              Border.all(color: dividerColor.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.format_list_bulleted, size: 18),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: MarkdownWidget(
+                data: _controller.text,
+                tocController: _tocController,
+                selectable: false,
+                config: (isDark
+                        ? MarkdownConfig.darkConfig
+                        : MarkdownConfig.defaultConfig)
+                    .copy(configs: [
+                  ImgConfig(builder:
+                      (String imageUrl, Map<String, String> attributes) {
+                    String imageId = imageUrl;
+                    if (imageUrl.startsWith('img_')) {
+                      imageUrl = _imageBase64Cache[imageUrl] ?? imageUrl;
+                    }
+                    final alt = attributes['alt'] ?? '图片';
+                    return MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          _showImagePreviewDialog(imageId, alt);
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: imageUrl.startsWith('data:image')
+                              ? Image.memory(
+                                  base64Decode(imageUrl.split(',').last))
+                              : Image.network(imageUrl),
+                        ),
+                      ),
+                    );
+                  })
+                ]),
+              ),
+            ),
+          ],
+        ),
+        contextMenuBuilder: (BuildContext context,
+            SelectableRegionState selectableRegionState) {
+          final appProvider = Provider.of<AppProvider>(context, listen: false);
+          final providerName = appProvider.selectedProvider;
+          final configs = appProvider.translationConfigs;
+          final currentConfig = configs.firstWhere(
+              (c) => c.provider == providerName,
+              orElse: () => configs.first);
+
+          bool isApiValid = currentConfig.apiKey.isNotEmpty;
+          if (providerName == 'baidu') {
+            isApiValid = currentConfig.apiKey.isNotEmpty &&
+                currentConfig.appId != null &&
+                currentConfig.appId!.isNotEmpty;
+          }
+
+          final buttonItems = selectableRegionState.contextMenuButtonItems;
+          if (appProvider.showTranslationButton) {
+            buttonItems.add(ContextMenuButtonItem(
+              onPressed: () {
+                if (!isApiValid) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('提示'),
+                      content:
+                          const Text('当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('取消')),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const SettingsPage()));
+                          },
+                          child: const Text('前往配置'),
+                        ),
+                      ],
+                    ),
+                  );
+                  selectableRegionState.hideToolbar();
+                  return;
+                }
+                final text = selectableRegionState.textEditingValue.selection
+                    .textInside(selectableRegionState.textEditingValue.text);
+                _translate(text);
+                selectableRegionState.hideToolbar();
+              },
+              label: '翻译',
+            ));
+          }
+          if (appProvider.showTtsButton) {
+            buttonItems.add(ContextMenuButtonItem(
+              onPressed: () {
+                if (!isApiValid) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('提示'),
+                      content: const Text('使用文本朗读功能前，请前往设置配置 API Key。'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('取消')),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const SettingsPage()));
+                          },
+                          child: const Text('前往配置'),
+                        ),
+                      ],
+                    ),
+                  );
+                  selectableRegionState.hideToolbar();
+                  return;
+                }
+                final text = selectableRegionState.textEditingValue.selection
+                    .textInside(selectableRegionState.textEditingValue.text);
+                _speak(text);
+                selectableRegionState.hideToolbar();
+              },
+              label: '▶ 播放',
+            ));
+          }
+          return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: selectableRegionState.contextMenuAnchors,
+              buttonItems: buttonItems);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
@@ -822,8 +1237,16 @@ class _HomePageState extends State<HomePage> with WindowListener {
         final fileName = currentFile != null
             ? currentFile.split(Platform.pathSeparator).last
             : '未命名';
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        // 优化背景色与面板色，增强层次感
+        final bgColor =
+            isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F2F5);
+        final cardColor = isDark ? const Color(0xFF252526) : Colors.white;
+        final dividerColor = Theme.of(context).dividerColor;
 
         return Scaffold(
+          backgroundColor: bgColor,
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight),
             child: GestureDetector(
@@ -838,494 +1261,147 @@ class _HomePageState extends State<HomePage> with WindowListener {
                 }
               },
               child: AppBar(
-                title: Text('$fileName'),
+                backgroundColor: cardColor,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                centerTitle: false,
+                title: Row(
+                  children: [
+                    Icon(Icons.edit_document,
+                        size: 20, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Text(
+                      fileName,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
                 actions: [
-                  // 文件操作按钮组
-                  IconButton(
-                    icon: const Icon(Icons.folder_open),
-                    tooltip: '打开文件',
-                    onPressed: _openFile,
+                  _buildToolbarButton(
+                      context, Icons.folder_open_rounded, '打开文件', _openFile),
+                  _buildToolbarButton(
+                      context, Icons.save_rounded, '保存', _saveFile),
+                  _buildToolbarButton(
+                      context, Icons.save_as_rounded, '另存为', _saveAsFile),
+
+                  Container(
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                    width: 1,
+                    color: dividerColor.withOpacity(0.3),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.save),
-                    tooltip: '保存',
-                    onPressed: _saveFile,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.save_as),
-                    tooltip: '另存为',
-                    onPressed: _saveAsFile,
-                  ),
-                  const SizedBox(width: 16),
-                  // 视图切换按钮组
+
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: ToggleButtons(
-                      borderRadius: BorderRadius.circular(8.0),
-                      isSelected: [
-                        _viewMode == ViewMode.edit,
-                        _viewMode == ViewMode.split,
-                        _viewMode == ViewMode.preview,
-                      ],
-                      onPressed: (int index) {
-                        setState(() {
-                          if (index == 0) _viewMode = ViewMode.edit;
-                          if (index == 1) _viewMode = ViewMode.split;
-                          if (index == 2) _viewMode = ViewMode.preview;
-                        });
-                      },
-                      children: const [
-                        Tooltip(
-                            message: '仅编辑',
-                            child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16),
-                                child: Icon(Icons.edit))),
-                        Tooltip(
-                            message: '双屏预览',
-                            child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16),
-                                child: Icon(Icons.vertical_split))),
-                        Tooltip(
-                            message: '仅预览',
-                            child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16),
-                                child: Icon(Icons.visibility))),
-                      ],
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[850] : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ToggleButtons(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderWidth: 0,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.15),
+                        selectedColor: Theme.of(context).colorScheme.primary,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        constraints:
+                            const BoxConstraints(minHeight: 36, minWidth: 42),
+                        isSelected: [
+                          _viewMode == ViewMode.edit,
+                          _viewMode == ViewMode.split,
+                          _viewMode == ViewMode.preview,
+                        ],
+                        onPressed: (int index) {
+                          setState(() {
+                            if (index == 0) _viewMode = ViewMode.edit;
+                            if (index == 1) _viewMode = ViewMode.split;
+                            if (index == 2) _viewMode = ViewMode.preview;
+                          });
+                        },
+                        children: const [
+                          Tooltip(
+                              message: '仅编辑',
+                              child: Icon(Icons.edit_outlined, size: 18)),
+                          Tooltip(
+                              message: '双屏预览',
+                              child: Icon(Icons.vertical_split_outlined,
+                                  size: 18)),
+                          Tooltip(
+                              message: '仅预览',
+                              child: Icon(Icons.visibility_outlined, size: 18)),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(Icons.settings),
-                    tooltip: '设置',
-                    onPressed: () {
-                      Navigator.push(
+
+                  Container(
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                    width: 1,
+                    color: dividerColor.withOpacity(0.3),
+                  ),
+
+                  _buildToolbarButton(context, Icons.settings_outlined, '设置',
+                      () {
+                    Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const SettingsPage()),
-                      );
+                            builder: (context) => const SettingsPage()));
+                  }),
+
+                  const SizedBox(width: 8),
+
+                  // Window controls
+                  _buildWindowButton(context, Icons.minimize, '最小化',
+                      () => windowManager.minimize()),
+                  _buildWindowButton(
+                    context,
+                    _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                    _isFullScreen ? '退出全屏' : '全屏',
+                    () async {
+                      windowManager.setFullScreen(!_isFullScreen);
                     },
                   ),
-                  const SizedBox(width: 16),
-                  // 手动增加最小化、全屏、还原按钮（黑色系/主题色，清晰可见）
-                  IconButton(
-                    icon: const Icon(Icons.minimize),
-                    tooltip: '最小化',
-                    onPressed: () => windowManager.minimize(),
+                  _buildWindowButton(
+                    context,
+                    Icons.close,
+                    '关闭',
+                    () => windowManager.close(),
+                    isClose: true,
                   ),
-                  IconButton(
-                    icon: Icon(_isFullScreen
-                        ? Icons.fullscreen_exit
-                        : Icons.fullscreen),
-                    tooltip: _isFullScreen ? '退出全屏' : '全屏',
-                    onPressed: () async {
-                      if (_isFullScreen) {
-                        windowManager.setFullScreen(false);
-                      } else {
-                        windowManager.setFullScreen(true);
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: '关闭',
-                    color: Colors.red,
-                    onPressed: () => windowManager.close(),
-                  ),
-                  // 为了避免遮挡系统自带的右上角控制按钮（TitleBarStyle.hidden 模式下系统会保留右上角的最小化/最大化/关闭），
-                  // 在最右侧留出足够的空白区域
-                  const SizedBox(width: 10),
                 ],
               ),
             ),
           ),
-          body: LayoutBuilder(
-            builder: (context, constraints) {
-              return Row(
-                children: [
-                  // 左侧编辑区
-                  if (_viewMode == ViewMode.edit || _viewMode == ViewMode.split)
-                    SizedBox(
-                      width: _viewMode == ViewMode.split
-                          ? constraints.maxWidth * _editAreaRatio
-                          : constraints.maxWidth,
-                      child: Container(
-                        padding: const EdgeInsets.all(16.0),
-                        color: Theme.of(context).cardColor,
-                        child: KeyboardListener(
-                          focusNode: _focusNode,
-                          onKeyEvent: (KeyEvent event) {
-                            try {
-                              // 监听 Ctrl+V (Windows/Linux) 或 Cmd+V (Mac)
-                              // 使用 HardwareKeyboard 的 isControlPressed 配合 KeyDownEvent 时，
-                              // 某些系统键盘可能会抛出状态不同步异常，我们捕获它防止崩溃
-                              if (event is KeyDownEvent &&
-                                  event.logicalKey == LogicalKeyboardKey.keyV) {
-                                if (HardwareKeyboard
-                                        .instance.isControlPressed ||
-                                    HardwareKeyboard.instance.isMetaPressed) {
-                                  _handlePaste();
-                                }
-                              }
-                            } catch (e) {
-                              Logger.error('键盘事件处理异常', e);
-                            }
-                          },
-                          child: TextField(
-                            controller: _controller,
-                            maxLines: null,
-                            expands: true,
-                            style: const TextStyle(
-                                fontFamily: 'Consolas', fontSize: 14),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: '在此输入 Markdown 内容...',
-                            ),
-                            onChanged: (text) {
-                              // 如果用户直接粘贴了完整的 base64，自动转换为短 ID
-                              final RegExp base64RegExp = RegExp(
-                                  r'!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^\)]+)\)');
-                              if (base64RegExp.hasMatch(text)) {
-                                final newText = text
-                                    .replaceAllMapped(base64RegExp, (match) {
-                                  final alt = match.group(1) ?? '图片';
-                                  final base64 = match.group(2)!;
-                                  final imageId =
-                                      'img_${DateTime.now().millisecondsSinceEpoch}_${match.start}';
-                                  _imageBase64Cache[imageId] = base64;
-                                  return '![$alt]($imageId)';
-                                });
-
-                                _controller.value = TextEditingValue(
-                                  text: newText,
-                                  selection: TextSelection.collapsed(
-                                      offset: newText.length),
-                                );
-                              } else {
-                                setState(() {}); // 触发预览更新
-                              }
-                            },
-                            contextMenuBuilder: (context, editableTextState) {
-                              final List<ContextMenuButtonItem> buttonItems =
-                                  editableTextState.contextMenuButtonItems;
-
-                              // 在原生菜单项后面插入一个“插入图片”选项
-                              buttonItems.add(ContextMenuButtonItem(
-                                onPressed: () {
-                                  _insertImageFromFile();
-                                  editableTextState.hideToolbar();
-                                },
-                                label: '插入图片',
-                              ));
-
-                              return AdaptiveTextSelectionToolbar.buttonItems(
-                                anchors: editableTextState.contextMenuAnchors,
-                                buttonItems: buttonItems,
-                              );
-                            },
-                          ),
-                        ),
+          body: Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  children: [
+                    if (_viewMode == ViewMode.edit ||
+                        _viewMode == ViewMode.split)
+                      SizedBox(
+                        width: _viewMode == ViewMode.split
+                            ? constraints.maxWidth * _editAreaRatio - 8
+                            : constraints.maxWidth,
+                        child: _buildEditorPanel(context, isDark, cardColor),
                       ),
-                    ),
-                  // 分割线与拖拽手柄
-                  if (_viewMode == ViewMode.split)
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanUpdate: (details) {
-                        setState(() {
-                          // 计算新的比例，限制在 10% 到 90% 之间防止某一边过小
-                          _editAreaRatio +=
-                              details.delta.dx / constraints.maxWidth;
-                          _editAreaRatio = _editAreaRatio.clamp(0.1, 0.9);
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: Container(
-                          width: 8, // 增加热区宽度方便拖拽
-                          color:
-                              Theme.of(context).dividerColor.withOpacity(0.1),
-                          child: Center(
-                            child: Container(
-                              width: 2,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).dividerColor,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                        ),
+                    if (_viewMode == ViewMode.split)
+                      _buildSplitter(constraints, isDark),
+                    if (_viewMode == ViewMode.preview ||
+                        _viewMode == ViewMode.split)
+                      Expanded(
+                        child: _buildPreviewPanel(context, isDark, cardColor),
                       ),
-                    ),
-                  // 右侧预览区
-                  if (_viewMode == ViewMode.preview ||
-                      _viewMode == ViewMode.split)
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(16.0),
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        child: SelectionArea(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_isTocExpanded)
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 260,
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).cardColor,
-                                    border: Border.all(
-                                      color: Theme.of(context).dividerColor,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 40,
-                                        child: Row(
-                                          children: [
-                                            const SizedBox(width: 12),
-                                            const Text(
-                                              '目录',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                            IconButton(
-                                              tooltip: '收起目录',
-                                              onPressed: () {
-                                                setState(() {
-                                                  _isTocExpanded = false;
-                                                });
-                                              },
-                                              icon: const Icon(
-                                                  Icons.chevron_left),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Divider(
-                                        height: 1,
-                                        color: Theme.of(context).dividerColor,
-                                      ),
-                                      Expanded(
-                                        child: TocWidget(
-                                          controller: _tocController,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                          tocTextStyle: TextStyle(
-                                            fontSize: 14,
-                                            color: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.color,
-                                          ),
-                                          currentTocTextStyle: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.blue,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                // 目录收起时，只保留一个圆形展开按钮
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Align(
-                                    alignment: Alignment.topCenter,
-                                    child: Material(
-                                      elevation: 2,
-                                      shape: const CircleBorder(),
-                                      clipBehavior: Clip.antiAlias,
-                                      color: Theme.of(context).cardColor,
-                                      child: IconButton(
-                                        tooltip: '展开目录',
-                                        onPressed: () {
-                                          setState(() {
-                                            _isTocExpanded = true;
-                                          });
-                                        },
-                                        icon: const Icon(
-                                            Icons.format_list_bulleted),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: MarkdownWidget(
-                                  data: _controller.text,
-                                  tocController: _tocController,
-                                  selectable: false,
-                                  config: (Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? MarkdownConfig.darkConfig
-                                          : MarkdownConfig.defaultConfig)
-                                      .copy(configs: [
-                                    ImgConfig(builder: (String imageUrl,
-                                        Map<String, String> attributes) {
-                                      String imageId = imageUrl;
-                                      if (imageUrl.startsWith('img_')) {
-                                        imageUrl =
-                                            _imageBase64Cache[imageUrl] ??
-                                                imageUrl;
-                                      }
-                                      final alt = attributes['alt'] ?? '图片';
-                                      return MouseRegion(
-                                        cursor: SystemMouseCursors.click,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            _showImagePreviewDialog(
-                                                imageId, alt);
-                                          },
-                                          child: imageUrl
-                                                  .startsWith('data:image')
-                                              ? Image.memory(
-                                                  base64Decode(
-                                                      imageUrl.split(',').last),
-                                                )
-                                              : Image.network(imageUrl),
-                                        ),
-                                      );
-                                    })
-                                  ]),
-                                ),
-                              ),
-                            ],
-                          ),
-                          contextMenuBuilder: (BuildContext context,
-                              SelectableRegionState selectableRegionState) {
-                            final appProvider = Provider.of<AppProvider>(
-                                context,
-                                listen: false);
-                            final providerName = appProvider.selectedProvider;
-                            final configs = appProvider.translationConfigs;
-
-                            final currentConfig = configs.firstWhere(
-                              (c) => c.provider == providerName,
-                              orElse: () => configs.first,
-                            );
-
-                            // 检查 API 配置是否有效
-                            bool isApiValid = currentConfig.apiKey.isNotEmpty;
-                            if (providerName == 'baidu') {
-                              isApiValid = currentConfig.apiKey.isNotEmpty &&
-                                  currentConfig.appId != null &&
-                                  currentConfig.appId!.isNotEmpty;
-                            }
-
-                            final buttonItems =
-                                selectableRegionState.contextMenuButtonItems;
-
-                            if (appProvider.showTranslationButton) {
-                              buttonItems.add(ContextMenuButtonItem(
-                                onPressed: () {
-                                  if (!isApiValid) {
-                                    // 未配置 API 时弹出提示
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('提示'),
-                                        content: const Text(
-                                            '当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('取消'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context); // 关闭弹窗
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const SettingsPage()),
-                                              );
-                                            },
-                                            child: const Text('前往配置'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    selectableRegionState.hideToolbar();
-                                    return;
-                                  }
-
-                                  final text = selectableRegionState
-                                      .textEditingValue.selection
-                                      .textInside(selectableRegionState
-                                          .textEditingValue.text);
-                                  _translate(text);
-                                  selectableRegionState.hideToolbar();
-                                },
-                                label: '翻译',
-                              ));
-                            }
-
-                            if (appProvider.showTtsButton) {
-                              buttonItems.add(ContextMenuButtonItem(
-                                onPressed: () {
-                                  if (!isApiValid) {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('提示'),
-                                        content: const Text(
-                                            '使用文本朗读功能前，请前往设置配置 API Key。'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('取消'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const SettingsPage()),
-                                              );
-                                            },
-                                            child: const Text('前往配置'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    selectableRegionState.hideToolbar();
-                                    return;
-                                  }
-                                  final text = selectableRegionState
-                                      .textEditingValue.selection
-                                      .textInside(selectableRegionState
-                                          .textEditingValue.text);
-                                  _speak(text);
-                                  selectableRegionState.hideToolbar();
-                                },
-                                label: '▶ 播放',
-                              ));
-                            }
-
-                            return AdaptiveTextSelectionToolbar.buttonItems(
-                              anchors: selectableRegionState.contextMenuAnchors,
-                              buttonItems: buttonItems,
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         );
       },

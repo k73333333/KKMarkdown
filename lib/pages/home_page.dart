@@ -194,8 +194,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     // 初始化 TTS
     _initTts();
     // 设置默认示例文本
-    _controller.text =
-        '# 欢迎使用 KKMarkdown\n\n这是一个轻量级的 Markdown 编辑器。\n\n## 功能特点\n- 实时预览\n- 划词翻译\n- 文本朗读\n\n试着选中这段文字看看！';
+    _controller.text = '# 欢迎使用 KKMarkdown\n\n这是一个 Markdown 编辑器。';
 
     // 监听窗口最大化状态
     windowManager.addListener(this);
@@ -834,7 +833,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
                 }
               },
               child: AppBar(
-                title: Text('KKMarkdown - $fileName'),
+                title: Text('$fileName'),
                 actions: [
                   // 文件操作按钮组
                   IconButton(

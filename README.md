@@ -2,7 +2,7 @@
  * @Author: fukaidong qiji777@yeah.net
  * @Date: 2026-03-11 09:44:26
  * @LastEditors: fukaidong qiji777@yeah.net
- * @LastEditTime: 2026-03-30 11:20:11
+ * @LastEditTime: 2026-04-02 14:50:21
  * @Description: .
 -->
 
@@ -12,14 +12,27 @@
 
 **作者**：fukaidong
 
+
+## 成品安装包与运行
+
+如果您只想直接运行应用，可以获取已打包好的成品文件。
+我们提供了自动化构建脚本 `build_package.ps1`，构建完成后，成品将存放在项目根目录的 `outputs/` 文件夹中：
+
+- **标准安装包 (.exe)**：`outputs/kkmarkdown_setup.exe` (最推荐，双击无痛安装，自动创建快捷方式)
+- **免安装绿色版**：`outputs/kkmarkdown_portable.zip` (解压即可运行)
+- **Windows 安装包**：`outputs/kkmarkdown_msix_setup.msix` (可能需要手动信任证书)
+
+详细的打包说明请参阅 [PACKAGING_GUIDE.md](./PACKAGING_GUIDE.md)。
+
+
 ## 主要功能
 
 - **Markdown 编辑与预览**：左侧编辑，右侧实时预览。
 - **本地文件管理**：支持打开、编辑、保存 `.md` 和 `.txt` 文件。
-- **划词功能**：在预览区选中文字后，支持：
+- **划词功能**：在预览区选中文字后，支持：(待完善)
   - **翻译**：调用配置的翻译接口进行翻译。
   - **朗读**：使用 TTS 朗读选中文本。
-- **自定义翻译源**：
+- **自定义翻译源**：(待完善)
   - 支持配置多个翻译服务商（如百度、谷歌等）。
   - 可自定义 API Key、App ID 和 Endpoint。
 - **多主题支持**：跟随系统或手动切换明暗主题。
@@ -34,17 +47,6 @@
 - **本地存储**：shared_preferences
 - **文本转语音**：flutter_tts
 - **窗口管理**：window_manager
-
-## 成品安装包与运行
-
-如果您只想直接运行应用，可以获取已打包好的成品文件。
-我们提供了自动化构建脚本 `build_package.ps1`，构建完成后，成品将存放在项目根目录的 `outputs/` 文件夹中：
-
-- **标准安装包 (.exe)**：`outputs/kkmarkdown_setup.exe` (最推荐，双击无痛安装，自动创建快捷方式)
-- **免安装绿色版**：`outputs/kkmarkdown_portable.zip` (解压即可运行)
-- **Windows 安装包**：`outputs/kkmarkdown_msix_setup.msix` (可能需要手动信任证书)
-
-详细的打包说明请参阅 [PACKAGING_GUIDE.md](./PACKAGING_GUIDE.md)。
 
 ## 快速开始 (开发者)
 

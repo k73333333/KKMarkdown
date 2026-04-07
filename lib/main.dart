@@ -67,6 +67,7 @@ class KKMarkdownApp extends StatelessWidget {
                 ColorScheme.fromSeed(seedColor: appProvider.themeColor),
             useMaterial3: true,
             brightness: Brightness.light,
+            fontFamily: 'Microsoft YaHei', // 全局设置亮色模式默认字体
           ),
           darkTheme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
@@ -75,6 +76,7 @@ class KKMarkdownApp extends StatelessWidget {
             ),
             useMaterial3: true,
             brightness: Brightness.dark,
+            fontFamily: 'Microsoft YaHei', // 全局设置暗色模式默认字体
           ),
           themeMode: appProvider.themeMode,
           home: const HomePage(),

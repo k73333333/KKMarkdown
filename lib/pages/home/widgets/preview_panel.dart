@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:provider/provider.dart';
 import '../../../../providers/app_provider.dart';
+import '../../../../utils/logger.dart';
 import '../../settings/settings_page.dart';
 
 /**
@@ -218,17 +220,57 @@ class PreviewPanel extends StatelessWidget {
           final buttonItems = selectableRegionState.contextMenuButtonItems;
           if (appProvider.showTranslationButton) {
             buttonItems.add(ContextMenuButtonItem(
-              onPressed: () {
+              onPressed: () async {
                 if (!isApiValid) {
                   _showApiConfigWarning(
                       context, '当前翻译服务未配置 API Key 或 App ID，请前往设置进行配置。');
                   selectableRegionState.hideToolbar();
                   return;
                 }
-                final textInside = selectableRegionState
-                    .textEditingValue.selection
-                    .textInside(selectableRegionState.textEditingValue.text);
-                onTranslate(textInside);
+
+                // 对于某些低版本的 Flutter，获取 selectionDelegates 可能会报错
+                // 所以我们通过系统提供的复制操作的回调来间接拦截并获取文本
+                String originalText = '';
+                try {
+                  // 对于复杂的 SelectableRegion，textEditingValue 经常无法拿到完整文本
+                  // 我们通过主动调用 copy() 来触发底层的获取机制，然后从剪贴板读取，再恢复剪贴板
+                  final oldData = await Clipboard.getData(Clipboard.kTextPlain);
+
+                  // 让系统帮我们复制选中的文本
+                  selectableRegionState
+                      .copySelection(SelectionChangedCause.toolbar);
+
+                  // 等待剪贴板写入完成
+                  await Future.delayed(const Duration(milliseconds: 50));
+
+                  final newData = await Clipboard.getData(Clipboard.kTextPlain);
+                  originalText = newData?.text ?? '';
+
+                  // 恢复原来的剪贴板内容，做到无痕获取
+                  if (oldData != null && oldData.text != null) {
+                    await Clipboard.setData(oldData);
+                  } else {
+                    // 如果原来是空的，清空它
+                    await Clipboard.setData(const ClipboardData(text: ''));
+                  }
+                } catch (e) {
+                  Logger.error('获取选中文本失败', e);
+                }
+
+                final textInside = originalText
+                    .replaceAll('_', '')
+                    .replaceAll('*', '')
+                    .replaceAll('#', '')
+                    .replaceAll('`', '')
+                    .replaceAll('~', '')
+                    .replaceAll('>', '')
+                    .replaceAll('-', '')
+                    .replaceAll('+', '')
+                    .trim();
+
+                if (textInside.isNotEmpty) {
+                  onTranslate(textInside);
+                }
                 selectableRegionState.hideToolbar();
               },
               label: '翻译',
@@ -236,16 +278,53 @@ class PreviewPanel extends StatelessWidget {
           }
           if (appProvider.showTtsButton) {
             buttonItems.add(ContextMenuButtonItem(
-              onPressed: () {
-                if (!isApiValid) {
-                  _showApiConfigWarning(context, '使用文本朗读功能前，请前往设置配置 API Key。');
-                  selectableRegionState.hideToolbar();
-                  return;
+              onPressed: () async {
+                String originalText = '';
+                try {
+                  // 对于复杂的 SelectableRegion，textEditingValue 经常无法拿到完整文本
+                  // 我们通过主动调用 copy() 来触发底层的获取机制，然后从剪贴板读取，再恢复剪贴板
+                  final oldData = await Clipboard.getData(Clipboard.kTextPlain);
+
+                  // 让系统帮我们复制选中的文本
+                  selectableRegionState
+                      .copySelection(SelectionChangedCause.toolbar);
+
+                  // 等待剪贴板写入完成
+                  await Future.delayed(const Duration(milliseconds: 50));
+
+                  final newData = await Clipboard.getData(Clipboard.kTextPlain);
+                  originalText = newData?.text ?? '';
+
+                  // 恢复原来的剪贴板内容，做到无痕获取
+                  if (oldData != null && oldData.text != null) {
+                    await Clipboard.setData(oldData);
+                  } else {
+                    await Clipboard.setData(const ClipboardData(text: ''));
+                  }
+                } catch (e) {
+                  Logger.error('获取选中文本失败', e);
                 }
-                final textInside = selectableRegionState
-                    .textEditingValue.selection
-                    .textInside(selectableRegionState.textEditingValue.text);
-                onSpeak(textInside);
+
+                Logger.info('原始提取文本: "$originalText"');
+
+                final textInside = originalText
+                    .replaceAll('_', '')
+                    .replaceAll('*', '')
+                    .replaceAll('#', '')
+                    .replaceAll('`', '')
+                    .replaceAll('~', '')
+                    .replaceAll('>', '')
+                    .replaceAll('-', '')
+                    .replaceAll('+', '')
+                    .trim();
+
+                Logger.info('清理后文本: "$textInside"');
+
+                if (textInside.isNotEmpty) {
+                  onSpeak(textInside);
+                } else {
+                  Logger.info('清理后文本为空，跳过朗读');
+                }
                 selectableRegionState.hideToolbar();
               },
               label: '▶ 播放',

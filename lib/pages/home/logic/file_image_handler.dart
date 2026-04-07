@@ -102,8 +102,12 @@ mixin FileAndImageHandler<T extends StatefulWidget> on State<T> {
 
   /**
    * 打开文件
+   * 
+   * @param controller 文本控制器
+   * @param onUpdate UI更新回调
+   * @return 成功打开返回 true，否则返回 false
    */
-  Future<void> openFile(
+  Future<bool> openFile(
       TextEditingController controller, VoidCallback onUpdate) async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -137,7 +141,9 @@ mixin FileAndImageHandler<T extends StatefulWidget> on State<T> {
             const SnackBar(content: Text('文件读取成功')),
           );
         }
+        return true;
       }
+      return false;
     } catch (e) {
       Logger.error('打开文件失败', e);
       if (mounted) {
@@ -145,6 +151,63 @@ mixin FileAndImageHandler<T extends StatefulWidget> on State<T> {
           SnackBar(content: Text('打开文件失败: $e')),
         );
       }
+      return false;
+    }
+  }
+
+  /**
+   * 从指定路径打开文件
+   * 
+   * @param path 文件绝对路径
+   * @param controller 文本控制器
+   * @param onUpdate UI更新回调
+   * @return 成功打开返回 true，否则返回 false
+   */
+  Future<bool> openFileFromPath(String path, TextEditingController controller,
+      VoidCallback onUpdate) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件不存在')),
+          );
+        }
+        return false;
+      }
+      
+      String content = await file.readAsString();
+
+      final RegExp base64RegExp =
+          RegExp(r'!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^\)]+)\)');
+      content = content.replaceAllMapped(base64RegExp, (match) {
+        final alt = match.group(1) ?? '';
+        final base64 = match.group(2)!;
+        final imageId =
+            'img_${DateTime.now().millisecondsSinceEpoch}_${match.start}';
+        imageBase64Cache[imageId] = base64;
+        return '![$alt]($imageId)';
+      });
+
+      controller.text = content;
+      onUpdate();
+
+      if (mounted) {
+        Provider.of<AppProvider>(context, listen: false)
+            .setCurrentFilePath(path);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('文件读取成功')),
+        );
+      }
+      return true;
+    } catch (e) {
+      Logger.error('打开文件失败: $path', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('打开文件失败: $e')),
+        );
+      }
+      return false;
     }
   }
 

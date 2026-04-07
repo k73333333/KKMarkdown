@@ -37,11 +37,14 @@ class AppProvider with ChangeNotifier {
   /** 是否显示划词翻译按钮 */
   bool _showTranslationButton = false;
 
-  /** 是否显示文本朗读按钮 */
-  bool _showTtsButton = false;
+  /** 是否显示文本朗读按钮，默认开启 */
+  bool _showTtsButton = true;
 
   /** 当前打开的文件绝对路径 */
   String? _currentFilePath;
+
+  /** 最近打开的文件历史记录列表 */
+  List<String> _recentFiles = [];
 
   /**
    * 获取当前主题模式
@@ -79,6 +82,11 @@ class AppProvider with ChangeNotifier {
   String? get currentFilePath => _currentFilePath;
 
   /**
+   * 获取最近打开的文件历史记录列表
+   */
+  List<String> get recentFiles => _recentFiles;
+
+  /**
    * 初始化 Provider
    * 加载本地存储的配置
    */
@@ -111,16 +119,29 @@ class AppProvider with ChangeNotifier {
       // 如果配置为空，添加默认配置
       if (_translationConfigs.isEmpty) {
         _translationConfigs = [
+          // 百度翻译服务配置
+          // 功能：提供基于百度翻译 API 的文本翻译能力
+          // 参数说明：
+          // - provider: 翻译服务提供商标识符，此处固定为 'baidu'
+          // - apiKey: 百度翻译服务的密钥，初始为空字符串，需用户配置
+          // - appId: 百度翻译服务的应用 ID，初始为空字符串，需用户配置
+          // - isEnabled: 是否启用该服务，默认设为 false
           TranslationConfig(
             provider: 'baidu',
             apiKey: '',
             appId: '',
-            isEnabled: true,
+            isEnabled: false,
           ),
+          // 谷歌翻译服务配置
+          // 功能：提供基于谷歌翻译 API 的文本翻译能力
+          // 参数说明：
+          // - provider: 翻译服务提供商标识符，此处固定为 'google'
+          // - apiKey: 谷歌翻译服务的 API Key，初始为空字符串，需用户配置
+          // - isEnabled: 是否启用该服务，默认设为 false
           TranslationConfig(
             provider: 'google',
             apiKey: '',
-            isEnabled: true,
+            isEnabled: false,
           ),
         ];
       }
@@ -128,9 +149,12 @@ class AppProvider with ChangeNotifier {
       // 加载选中的服务商
       _selectedProvider = prefs.getString('selectedProvider') ?? 'baidu';
 
-      // 加载按钮显示状态
+      // 加载按钮显示状态，未配置时文本朗读按钮默认开启
       _showTranslationButton = prefs.getBool('showTranslationButton') ?? false;
-      _showTtsButton = prefs.getBool('showTtsButton') ?? false;
+      _showTtsButton = prefs.getBool('showTtsButton') ?? true;
+
+      // 加载最近打开的文件历史记录
+      _recentFiles = prefs.getStringList('recentFiles') ?? [];
 
       // 同步配置到 TranslationManager
       _syncToTranslationManager();
@@ -259,7 +283,33 @@ class AppProvider with ChangeNotifier {
    */
   void setCurrentFilePath(String? path) {
     _currentFilePath = path;
+    if (path != null && path.isNotEmpty) {
+      _addRecentFile(path);
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /**
+   * 记录最近打开的文件路径
+   * @param path 文件绝对路径
+   */
+  Future<void> _addRecentFile(String path) async {
+    _recentFiles.remove(path); // 移除旧的记录（如果存在）
+    _recentFiles.insert(0, path); // 添加到最前面
+
+    // 限制历史记录最多保存 50 条
+    if (_recentFiles.length > 50) {
+      _recentFiles = _recentFiles.sublist(0, 50);
+    }
+
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('recentFiles', _recentFiles);
+    } catch (e) {
+      Logger.error('保存最近文件历史记录失败', e);
+    }
   }
 
   /**

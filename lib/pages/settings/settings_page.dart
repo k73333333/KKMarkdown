@@ -18,8 +18,13 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late List<TranslationConfig> _editingConfigs;
+  // 是否在 Markdown 预览面板的右键菜单中显示“翻译”按钮
+  // 该状态同步自全局配置 (AppProvider)，在设置页中可以通过 Switch 组件进行开关切换
   bool _showTranslationButton = false;
-  bool _showTtsButton = false;
+
+  // 是否在 Markdown 预览面板的右键菜单中显示“▶ 播放” (文本转语音) 按钮
+  // 该状态同步自全局配置 (AppProvider)，在设置页中可以通过 Switch 组件进行开关切换
+  bool _showTtsButton = true;
   late Color _themeColor;
 
   @override

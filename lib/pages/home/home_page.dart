@@ -31,8 +31,8 @@ class _HomePageState extends State<HomePage>
   ViewMode _viewMode = ViewMode.split;
   final TocController _tocController = TocController();
   bool _isTocExpanded = false;
-  bool _isMaximized = false;
-  bool _isFullScreen = false;
+  bool _isMaximized = false; // 窗口是否处于最大化状态
+  bool _isFullScreen = false; // 窗口是否处于全屏状态
   double _editAreaRatio = 0.5;
 
   late final MarkdownTextEditingController _controller;
@@ -83,6 +83,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void onWindowMaximize() {
+    // 监听到窗口最大化事件，更新状态
     setState(() {
       _isMaximized = true;
     });
@@ -90,6 +91,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void onWindowUnmaximize() {
+    // 监听到窗口还原事件，更新状态
     setState(() {
       _isMaximized = false;
     });
@@ -121,9 +123,26 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _initTts() async {
     try {
-      await _flutterTts.setLanguage("zh-CN");
+      // 针对 Windows 平台：默认英文语音无法朗读中文，且 flutter_tts 插件的 setVoice 在 Windows 存在 Bug。
+      // 因此我们需要通过 getVoices 找到中文语音包，提取其底层 Language ID (如 "804")，然后通过 setLanguage 切换。
+      final voices = await _flutterTts.getVoices;
+      String targetLanguage = "zh-CN"; // 默认 fallback
+      if (voices != null) {
+        for (var voice in voices) {
+          final locale = voice['locale']?.toString() ?? '';
+          final name = voice['name']?.toString().toLowerCase() ?? '';
+          // 匹配常见的中文语音包
+          if (name.contains('huihui') || name.contains('yaoyao') || name.contains('kangkang') || name.contains('hanhan') || name.contains('chinese') || locale.toLowerCase() == 'zh-cn') {
+            targetLanguage = locale;
+            break;
+          }
+        }
+      }
+
+      await _flutterTts.setLanguage(targetLanguage);
       await _flutterTts.setPitch(1.0);
       await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
     } catch (e) {
       Logger.error('TTS 初始化失败', e);
     }
@@ -132,6 +151,9 @@ class _HomePageState extends State<HomePage>
   Future<void> _speak(String text) async {
     if (text.isEmpty) return;
     try {
+      Logger.info('准备朗读文本: $text');
+      // 播放前先停止之前的朗读，防止底层引擎卡死导致后续无声
+      await _flutterTts.stop(); 
       await _flutterTts.speak(text);
     } catch (e) {
       Logger.error('TTS 朗读失败', e);
@@ -259,7 +281,27 @@ class _HomePageState extends State<HomePage>
             dividerColor: dividerColor,
             viewMode: _viewMode,
             isFullScreen: _isFullScreen,
-            onOpenFile: () => openFile(_controller, () => setState(() {})),
+            isMaximized: _isMaximized,
+            onOpenFile: () async {
+              // 尝试打开文件
+              bool success = await openFile(_controller, () => setState(() {}));
+              // 如果文件打开成功，将视图模式切换为仅预览
+              if (success && mounted) {
+                setState(() {
+                  _viewMode = ViewMode.preview;
+                });
+              }
+            },
+            onOpenFileFromPath: (path) async {
+              // 尝试从指定路径打开文件
+              bool success = await openFileFromPath(
+                  path, _controller, () => setState(() {}));
+              if (success && mounted) {
+                setState(() {
+                  _viewMode = ViewMode.preview;
+                });
+              }
+            },
             onSaveFile: () => saveFile(_controller.text),
             onSaveAsFile: () => saveAsFile(_controller.text),
             onViewModeChanged: (mode) => setState(() => _viewMode = mode),

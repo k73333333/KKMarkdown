@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../settings/settings_page.dart';
 import '../view_mode.dart';
+import 'open_file_button.dart';
 
 /**
  * 顶部工具栏组件
@@ -12,8 +13,10 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Color cardColor;
   final Color dividerColor;
   final ViewMode viewMode;
-  final bool isFullScreen;
-  final VoidCallback onOpenFile;
+  final bool isFullScreen; // 窗口是否处于全屏状态
+  final bool isMaximized; // 窗口是否处于最大化状态
+  final VoidCallback onOpenFile; // 打开文件回调
+  final Function(String path) onOpenFileFromPath; // 从指定路径打开文件回调
   final VoidCallback onSaveFile;
   final VoidCallback onSaveAsFile;
   final ValueChanged<ViewMode> onViewModeChanged;
@@ -26,7 +29,9 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.dividerColor,
     required this.viewMode,
     required this.isFullScreen,
+    required this.isMaximized,
     required this.onOpenFile,
+    required this.onOpenFileFromPath,
     required this.onSaveFile,
     required this.onSaveAsFile,
     required this.onViewModeChanged,
@@ -112,8 +117,10 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
         actions: [
-          _buildToolbarButton(
-              context, Icons.folder_open_rounded, '打开文件', onOpenFile),
+          OpenFileButton(
+            onOpenFile: onOpenFile,
+            onOpenFileFromPath: onOpenFileFromPath,
+          ),
           _buildToolbarButton(context, Icons.save_rounded, '保存', onSaveFile),
           _buildToolbarButton(
               context, Icons.save_as_rounded, '另存为', onSaveAsFile),
@@ -171,15 +178,32 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 MaterialPageRoute(builder: (context) => const SettingsPage()));
           }),
           const SizedBox(width: 8),
-          // Window controls
-          _buildWindowButton(
-              context, Icons.minimize, '最小化', () => windowManager.minimize()),
+          // 窗口控制 - 全屏/退出全屏按钮
           _buildWindowButton(
             context,
             isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
             isFullScreen ? '退出全屏' : '全屏',
             () async {
               windowManager.setFullScreen(!isFullScreen);
+            },
+          ),
+          // Window controls
+          _buildWindowButton(
+              context, Icons.minimize, '最小化', () => windowManager.minimize()),
+          // 窗口控制 - 最大化/还原按钮
+          _buildWindowButton(
+            context,
+            // 根据当前是否最大化状态显示不同图标
+            isMaximized ? Icons.filter_none : Icons.crop_square,
+            // 根据当前是否最大化状态显示不同提示文本
+            isMaximized ? '向下还原' : '最大化',
+            () async {
+              // 点击时切换最大化/还原状态
+              if (isMaximized) {
+                windowManager.unmaximize();
+              } else {
+                windowManager.maximize();
+              }
             },
           ),
           _buildWindowButton(

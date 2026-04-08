@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/app_provider.dart';
 import '../../models/translation_config.dart';
 import 'widgets/api_config_card.dart';
@@ -142,8 +144,79 @@ class _SettingsPageState extends State<SettingsPage> {
             });
           },
         ),
+        const Divider(),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16.0),
+          child: Text(
+            '关于与支持',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ListTile(
+          title: const Text('问题反馈'),
+          subtitle: const Text('遇到 Bug 或有建议？欢迎发送邮件联系作者'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.email),
+                tooltip: '拉起邮箱客户端',
+                onPressed: () async {
+                  final Uri emailLaunchUri = Uri(
+                    scheme: 'mailto',
+                    path: 'qiji777@yeah.net',
+                    query: _encodeQueryParameters(<String, String>{
+                      'subject': '[问题反馈] KKMarkdown',
+                      'body': '请在此处描述您遇到的问题或建议：\n\n'
+                    }),
+                  );
+                  if (await canLaunchUrl(emailLaunchUri)) {
+                    await launchUrl(emailLaunchUri).catchError((e) {
+                      // ***拉起邮箱客户端失败
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('无法打开邮件客户端，请检查系统设置')),
+                      );
+                      return false; // 返回 false 以满足类型推导
+                    });
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('当前设备不支持直接拉起邮件')),
+                    );
+                  }
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: '复制邮箱地址',
+                onPressed: () async {
+                  await Clipboard.setData(const ClipboardData(text: 'qiji777@yeah.net'))
+                      .then((_) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('邮箱地址已复制到剪贴板')),
+                    );
+                  }).catchError((e) {
+                    // ***复制邮箱地址失败
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('复制失败')),
+                    );
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
       ],
     );
+  }
+
+  /**
+   * 编码邮件 URL 参数
+   */
+  String? _encodeQueryParameters(Map<String, String> params) {
+    return params.entries
+        .map((MapEntry<String, String> e) =>
+            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
   }
 
   /**

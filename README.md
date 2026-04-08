@@ -1,14 +1,6 @@
-<!--
- * @Author: fukaidong qiji777@yeah.net
- * @Date: 2026-03-11 09:44:26
- * @LastEditors: fukaidong qiji777@yeah.net
- * @LastEditTime: 2026-04-02 19:29:40
- * @Description: .
--->
-
 # KKMarkdown
 
-一个轻量级的 Markdown 阅读器/编辑器，使用 Flutter 开发，支持 Windows 平台。
+一个免费的 Markdown 阅读器/编辑器，支持 Windows 平台、文本朗读等功能，使用 Flutter 开发。
 
 **作者**：fukaidong
 
@@ -59,6 +51,21 @@
    flutter pub get
    flutter run -d windows
    ```
+
+### 常见问题：Windows 权限拦截导致编译失败
+
+在 Windows 平台上执行 `flutter build windows` 或 `flutter run` 时，若遇到以下错误：
+> `ERROR_ACCESS_DENIED file system exception thrown while trying to create a symlink from source to dest`
+
+这是由于 Windows 系统（或杀毒软件如奇安信）拦截了普通用户创建符号链接（Symlink）的权限。**解决方案**：
+
+1. 打开终端（无需管理员权限），确保已执行 `flutter pub get`。
+2. 在项目根目录执行环境修复脚本：
+   ```powershell
+   .\create_junctions.ps1
+   ```
+   *(该脚本会自动读取依赖并创建安全的目录联接 Junction，从而完美绕过系统的软链接拦截)*
+3. 再次运行 `flutter run -d windows` 或构建命令即可顺利通过。
 
 3. **配置翻译**：
    - 启动应用后，点击右上角设置图标。

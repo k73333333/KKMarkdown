@@ -1,5 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+
+# 强制指定使用 Visual Studio 2022 工具链
+set(CMAKE_GENERATOR "Visual Studio 17 2022" CACHE INTERNAL "" FORCE)
+set(CMAKE_GENERATOR_PLATFORM x64 CACHE INTERNAL "" FORCE)
+
 project(kkmarkdown LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
@@ -46,6 +51,7 @@ function(APPLY_STANDARD_SETTINGS TARGET)
 endfunction()
 
 # Flutter library and tool build rules.
+set(FLUTTER_PLUGIN_SYMLINKS OFF)
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
